@@ -1,0 +1,25 @@
+{
+  "location": "Home",
+  "calendar": "calendar.example",
+  "calendarNames": [],
+  "weather": null,
+  "indoorTemperature": null,
+  "quickActions": [],
+  "speakers": [],
+  "cameras": [],
+  "musicAssistantEntryId": null,
+  "energy": {
+    "solar": null,
+    "grid": null,
+    "gridPositiveIsImport": true,
+    "home": null,
+    "deriveHome": false,
+    "assumeMissingSolarZero": false,
+    "solarMeter": null,
+    "solarMeterDecreaseToleranceWh": 0,
+    "importMeter": null,
+    "exportMeter": null,
+    "gasMeter": null,
+    "consumers": []
+  }
+}
