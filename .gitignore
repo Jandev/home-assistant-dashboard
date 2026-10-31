@@ -6,4 +6,6 @@ dist/
 data/
 coverage/
 *.log
+docs/
+generated_images/
 config/dashboard.json
