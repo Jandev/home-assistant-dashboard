@@ -119,7 +119,23 @@ function roomsView() {
 }
 function energyView() {
   const e = state.energy, direction = e.grid === null ? 'Netrichting niet beschikbaar' : Math.abs(e.grid) < 10 ? 'Net · ongeveer neutraal' : e.grid > 0 ? '↓ Afname van het net' : '↑ Terug naar het net';
-  return `<div class="grid energy"><article class="card energy-visual"><h2>Zo stroomt je energie</h2><div class="house"><img src="/assets/house-energy.png" alt="Illustratie van het eigen huis met zonnepanelen"><svg class="energy-path" viewBox="0 0 600 400" aria-hidden="true"><path class="${e.solar > 0 ? 'active' : ''}" d="M100 80 L270 150 L300 330"/><path class="${e.grid !== null && Math.abs(e.grid) >= 10 ? 'active' : ''} ${e.grid < 0 ? 'reverse' : ''}" d="M500 220 L400 220 L300 330"/></svg><div class="flow solar solar-summary"><b>☀ Zonnepanelen</b><div class="solar-reading"><span>Huidige opbrengst</span><strong>${watts(e.solar)}</strong></div><div class="solar-reading"><span>Direct verbruik</span><strong>${watts(e.directConsumption)}</strong></div><small class="flow-source">${e.solarAssumedZero ? 'Geen actuele opwekmeting · opwek als 0 W weergegeven' : 'Direct verbruik is zonnestroom die nu in huis wordt gebruikt.'}</small></div><div class="flow net">${direction}<b class="number">${watts(e.grid)}</b></div></div><button class="pill full" data-history="day">Bekijk historie · dag / week / maand →</button><p class="note">${e.solarAssumedZero ? 'Opwek momenteel niet gemeten: berekend met 0 W. Totaal huisverbruik bestaat uit direct verbruik van zonnestroom plus netafname.' : 'Direct verbruik = opwek min teruglevering. Totaal huisverbruik = direct verbruik plus netafname.'}</p></article><article class="card"><h2>Vandaag <small class="energy-period">vanaf 00:00${e.daily.periodEnd ? ' · bijgewerkt ' + time(e.daily.periodEnd) : ''}</small></h2><div class="metrics">${[['solar', 'Opgewekt'], ['home', 'Totaal huisverbruik'], ['import', 'Netafname'], ['export', 'Teruggeleverd']].map(([key, label]) => `<div><small>${label}</small><b>${fmt(e.daily[key]?.value, 'kWh', 2)}</b>${e.daily[key]?.stale ? `<small class="note error">${key === 'home' ? 'Op basis van laatste opwekmeting' : 'Laatste geldige meting'}${e.daily[key].updatedAt ? ' · ' + time(e.daily[key].updatedAt) : ''}</small>` : ''}</div>`).join('')}</div><button class="pill full" data-energy-readings>Meetstanden en berekening →</button><div class="consumers"><h3>Gemeten apparaten</h3>${e.consumers.map(c => `<p>${esc(c.name)}<b>${fmt(c.value, c.unit)}</b></p>`).join('')}<p>Gas vandaag<b>${fmt(e.daily.gas?.value, 'm³', 2)}</b></p></div><button class="pill full" data-consumers>Alle gemeten apparaten →</button><p class="note">Dagtotalen vereisen recorderhistorie met een geldige beginstand. ${esc(e.daily.error || '')} ${esc((e.daily.warnings || []).join(' '))}</p></article></div>`;
+  return `<div class="grid energy"><article class="card energy-visual"><h2>Zo stroomt je energie</h2><div class="house"><img src="/assets/house-energy.png" alt="Illustratie van het eigen huis met zonnepanelen"><svg class="energy-path" viewBox="0 0 600 400" aria-hidden="true"><path data-energy-path="solar" class="${e.solar > 0 ? 'active' : ''}" d="M100 80 L270 150 L300 330"/><path data-energy-path="grid" class="${e.grid !== null && Math.abs(e.grid) >= 10 ? 'active' : ''} ${e.grid < 0 ? 'reverse' : ''}" d="M500 220 L400 220 L300 330"/></svg><div class="flow solar solar-summary"><b>☀ Zonnepanelen</b><div class="solar-reading"><span>Huidige opbrengst</span><strong>${watts(e.solar)}</strong></div><div class="solar-reading"><span>Direct verbruik</span><strong>${watts(e.directConsumption)}</strong></div><small class="flow-source">${e.solarAssumedZero ? 'Geen actuele opwekmeting · opwek als 0 W weergegeven' : 'Direct verbruik is zonnestroom die nu in huis wordt gebruikt.'}</small></div><div class="flow net">${direction}<b class="number">${watts(e.grid)}</b></div></div><button class="pill full" data-history="day">Bekijk historie · dag / week / maand →</button><p class="note">${e.solarAssumedZero ? 'Opwek momenteel niet gemeten: berekend met 0 W. Totaal huisverbruik bestaat uit direct verbruik van zonnestroom plus netafname.' : 'Direct verbruik = opwek min teruglevering. Totaal huisverbruik = direct verbruik plus netafname.'}</p></article><article class="card"><h2>Vandaag <small class="energy-period">vanaf 00:00${e.daily.periodEnd ? ' · bijgewerkt ' + time(e.daily.periodEnd) : ''}</small></h2><div class="metrics">${[['solar', 'Opgewekt'], ['home', 'Totaal huisverbruik'], ['import', 'Netafname'], ['export', 'Teruggeleverd']].map(([key, label]) => `<div><small>${label}</small><b>${fmt(e.daily[key]?.value, 'kWh', 2)}</b>${e.daily[key]?.stale ? `<small class="note error">${key === 'home' ? 'Op basis van laatste opwekmeting' : 'Laatste geldige meting'}${e.daily[key].updatedAt ? ' · ' + time(e.daily[key].updatedAt) : ''}</small>` : ''}</div>`).join('')}</div><button class="pill full" data-energy-readings>Meetstanden en berekening →</button><div class="consumers"><h3>Gemeten apparaten</h3>${e.consumers.map(c => `<p>${esc(c.name)}<b>${fmt(c.value, c.unit)}</b></p>`).join('')}<p>Gas vandaag<b>${fmt(e.daily.gas?.value, 'm³', 2)}</b></p></div><button class="pill full" data-consumers>Alle gemeten apparaten →</button><p class="note">Dagtotalen vereisen recorderhistorie met een geldige beginstand. ${esc(e.daily.error || '')} ${esc((e.daily.warnings || []).join(' '))}</p></article></div>`;
+}
+function syncEnergyPaths() {
+  const svg = $('.energy-path');
+  if (!svg) return;
+  const inverse = svg.getScreenCTM()?.inverse();
+  if (!inverse) return;
+  const center = element => {
+    const rect = element.getBoundingClientRect(), point = svg.createSVGPoint();
+    point.x = rect.left + rect.width / 2; point.y = rect.top + rect.height / 2;
+    return point.matrixTransform(inverse);
+  };
+  const solar = $('.energy .solar-summary'), net = $('.energy .flow.net');
+  if (!solar || !net) return;
+  const solarPoint = center(solar), netPoint = center(net);
+  svg.querySelector('[data-energy-path="solar"]')?.setAttribute('d', `M${solarPoint.x} ${solarPoint.y} L270 150 L300 330`);
+  svg.querySelector('[data-energy-path="grid"]')?.setAttribute('d', `M${netPoint.x} ${netPoint.y} L400 220 L300 330`);
 }
 function showEnergyReadings() {
   const d = state.energy.daily;
@@ -154,6 +170,7 @@ function render() {
   $('#content').innerHTML = [energyView, roomsView, todayView, musicView, cameraView][page]();
   $('#content').scrollTop = scroll?.content || 0;
   if (scroll) $('#content').querySelectorAll('.card').forEach((card, index) => { card.scrollTop = scroll.cards[index] || 0; });
+  syncEnergyPaths();
   lastRenderedPage = page;
   if (page === 3 && state.music.library) loadFavorites();
   if (dialogMode === 'room') renderRoom(selectedRoom);
@@ -359,6 +376,7 @@ $('dialog').addEventListener('pointerdown', event => { backdropPress = outsideDi
 $('dialog').addEventListener('click', event => { if (backdropPress && outsideDialog(event)) $('dialog').close(); backdropPress = false; });
 $('dialog').addEventListener('close', () => { releaseCameras($('#dialog-body')); $('#dialog-body').innerHTML = ''; dialogMode = null; if (page === 4) { connectionStatus(); manageCamera(); } else render(); });
 document.addEventListener('visibilitychange', () => { manageCamera(); if (!document.hidden) { refreshCameras(); load(); } });
+window.addEventListener('resize', syncEnergyPaths, { passive: true });
 let start;
 $('#content').addEventListener('touchstart', e => { start = null; if (!e.target.closest('button,input,select,a,[data-no-swipe]')) start = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }, { passive: true });
 $('#content').addEventListener('touchend', e => { if (!start) return; const dx = e.changedTouches[0].clientX - start.x, dy = e.changedTouches[0].clientY - start.y; if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) navigate(page + (dx < 0 ? 1 : -1)); start = null; }, { passive: true });
