@@ -1,0 +1,67 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Lokaal: dependencies installeren",
+      "type": "shell",
+      "command": "npm ci",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lokaal: syntax controleren",
+      "type": "npm",
+      "script": "check",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lokaal: integratietests",
+      "type": "npm",
+      "script": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lokaal: dashboard bouwen",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lokaal: controleren en bouwen",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Lokaal: dependencies installeren",
+        "Lokaal: syntax controleren",
+        "Lokaal: integratietests",
+        "Lokaal: dashboard bouwen"
+      ],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lokaal: starten en testen",
+      "type": "npm",
+      "script": "dev",
+      "dependsOn": "Lokaal: controleren en bouwen",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "dashboard",
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*node --watch.*$",
+          "endsPattern": "^Dashboard luistert op poort [0-9]+$"
+        }
+      },
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "runOptions": { "instanceLimit": 1 }
+    }
+  ]
+}
