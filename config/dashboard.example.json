@@ -1,25 +1,44 @@
 {
-  "location": "Home",
-  "calendar": "calendar.example",
-  "calendarNames": [],
+  "location": "Voorbeeldplaats",
+  "calendar": "calendar.demo_household",
+  "calendarNames": ["Alex", "Riley", "Casey", "Jordan"],
   "weather": null,
   "indoorTemperature": null,
-  "quickActions": [],
-  "speakers": [],
-  "cameras": [],
+  "quickActions": [
+    { "name": "Badkamer uit", "action": "off", "entities": ["light.demo_bathroom_mirror", "light.demo_bathroom_ceiling"] },
+    { "name": "Leeslamp", "entities": ["light.demo_reading_lamp"] },
+    { "name": "Avondscène", "entities": ["scene.demo_evening"] },
+    { "name": "Woonkamer uit", "entities": ["scene.demo_living_room_off"] }
+  ],
+  "speakers": [
+    { "name": "Eetkamer", "entity": "media_player.demo_dining_room" },
+    { "name": "TV", "entity": "media_player.demo_tv" }
+  ],
+  "cameras": [
+    { "name": "NVR · kanaal 2", "entity": "camera.demo_nvr_channel_2" },
+    { "name": "NVR · kanaal 1", "entity": "camera.demo_nvr_channel_1" },
+    { "name": "NVR · kanaal 3", "entity": "camera.demo_nvr_channel_3" },
+    { "name": "NVR · kanaal 4", "entity": "camera.demo_nvr_channel_4" },
+    { "name": "NVR · kanaal 5", "entity": "camera.demo_nvr_channel_5" }
+  ],
   "musicAssistantEntryId": null,
   "energy": {
-    "solar": null,
-    "grid": null,
+    "solar": "sensor.demo_solar_power",
+    "grid": "sensor.demo_grid_power",
     "gridPositiveIsImport": true,
     "home": null,
-    "deriveHome": false,
-    "assumeMissingSolarZero": false,
-    "solarMeter": null,
-    "solarMeterDecreaseToleranceWh": 0,
-    "importMeter": null,
-    "exportMeter": null,
-    "gasMeter": null,
-    "consumers": []
+    "deriveHome": true,
+    "assumeMissingSolarZero": true,
+    "solarMeter": "sensor.demo_solar_energy_total",
+    "solarMeterDecreaseToleranceWh": 10,
+    "importMeter": "sensor.demo_grid_import_total",
+    "exportMeter": "sensor.demo_grid_export_total",
+    "gasMeter": "sensor.demo_gas_total",
+    "consumers": [
+      "sensor.demo_kitchen_power",
+      "sensor.demo_office_power",
+      "sensor.demo_laundry_power",
+      "sensor.demo_media_power"
+    ]
   }
 }
