@@ -95,7 +95,7 @@ export class Dashboard {
     const daily = this.daily.day === localDate() ? structuredClone(this.daily) : {};
     if (e.deriveHome && daily.solar && daily.import && daily.export && daily.solar.value + daily.import.value >= daily.export.value) daily.home = { value: daily.solar.value + daily.import.value - daily.export.value, unit: 'kWh', stale: [daily.solar, daily.import, daily.export].some(value => value.stale), updatedAt: [daily.solar, daily.import, daily.export].filter(value => value.stale).map(value => value.updatedAt).filter(Boolean).sort()[0] || daily.lastSuccessAt };
     return {
-      location: c.location, connection: { live: ha.connected, lastSuccessAt: ha.lastSuccessAt, stale: !ha.lastSuccessAt || Date.now() - Date.parse(ha.lastSuccessAt) > 90000 },
+      location: c.location, calendarNames: c.calendarNames || [], connection: { live: ha.connected, lastSuccessAt: ha.lastSuccessAt, stale: !ha.lastSuccessAt || Date.now() - Date.parse(ha.lastSuccessAt) > 90000 },
       entities: Object.fromEntries([...ids].filter(Boolean).map(id => [id, entityView(get(id))])),
       rooms, quickActions: c.quickActions, speakers: c.speakers, cameras: c.cameras,
       scenes: [...ha.states.values()].filter(s => s.entity_id.startsWith('scene.')).map(entityView),

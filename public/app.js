@@ -44,6 +44,14 @@ const entity = id => state?.entities[id];
 const offline = id => !entity(id)?.available || state.connection.stale || !state.connection.live;
 const empty = text => `<div class="empty">${esc(text)}</div>`;
 const updated = date => date ? `Bijgewerkt ${time(date)}` : 'Nog niet opgehaald';
+const agendaColors = ['blue', 'pink', 'red', 'orange'];
+function agendaColor(name) {
+  const index = state.calendarNames?.indexOf(name) ?? -1;
+  if (index >= 0) return agendaColors[index % agendaColors.length];
+  let hash = 0;
+  for (const char of String(name).toLocaleLowerCase()) hash = (hash * 31 + char.codePointAt(0)) >>> 0;
+  return agendaColors[hash % agendaColors.length];
+}
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? { cache: 'no-store' } : { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Dashboard-Request': '1' }, body: JSON.stringify(body) });
   const json = await r.json(); if (!r.ok) throw new Error(json.error || 'Verbinding mislukt'); return json;
@@ -65,7 +73,8 @@ function agenda(limit) {
   let lastDay;
   return events.slice(0, limit).map((e, i) => {
     const day = e.allDay ? e.start : dayOf(e.start), heading = day !== lastDay ? `<div class="day">${esc(dayLabel(day))}</div>` : ''; lastDay = day;
-    return `${heading}<button class="event" data-event="${i}"><time>${e.allDay ? 'Hele dag' : time(e.start)}</time><div><b>${esc(e.title)}</b><p>${esc(e.location || (e.allDay ? 'Dagevenement' : e.end ? `Tot ${time(e.end)}` : ''))}</p>${e.names.length > 1 ? e.names.map(n => `<span class="badge">${esc(n)}</span>`).join('') : ''}</div></button>`;
+    const names = e.names || [], color = names.length === 1 ? agendaColor(names[0]) : '';
+    return `${heading}<button class="event ${color}" data-event="${i}"><time>${e.allDay ? 'Hele dag' : time(e.start)}</time><div><b>${esc(e.title)}</b><p>${esc(e.location || (e.allDay ? 'Dagevenement' : e.end ? `Tot ${time(e.end)}` : ''))}</p>${names.length > 1 ? names.map(n => `<span class="badge ${agendaColor(n)}">${esc(n)}</span>`).join('') : ''}</div></button>`;
   }).join('');
 }
 function forecastCondition(day) {
