@@ -15,6 +15,6 @@ export async function fetchJSON(url, options = {}) {
   return response.json();
 }
 export const namesIn = (title, names = []) => {
-  const words = new Set(String(title).toLocaleLowerCase().match(/[\\p{L}\\p{N}]+/gu) || []);
+  const words = new Set(String(title).toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
   return names.filter(name => words.has(String(name).toLocaleLowerCase()));
 };
