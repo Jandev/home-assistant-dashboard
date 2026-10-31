@@ -135,7 +135,7 @@ function syncEnergyPaths() {
   if (!solar || !net) return;
   const solarPoint = center(solar), netPoint = center(net);
   svg.querySelector('[data-energy-path="solar"]')?.setAttribute('d', `M${solarPoint.x} ${solarPoint.y} L270 150 L300 330`);
-  svg.querySelector('[data-energy-path="grid"]')?.setAttribute('d', `M${netPoint.x} ${netPoint.y} L400 220 L300 330`);
+  svg.querySelector('[data-energy-path="grid"]')?.setAttribute('d', `M${netPoint.x} ${netPoint.y} L300 330`);
 }
 function showEnergyReadings() {
   const d = state.energy.daily;
