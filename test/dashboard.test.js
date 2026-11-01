@@ -95,6 +95,13 @@ test('HTTP-grens beschermt geheimen, bestanden en apparaatbediening', async t =>
   await new Promise(r => app.server.listen(0, '127.0.0.1', r)); t.after(() => app.stop());
   const base = `http://127.0.0.1:${app.server.address().port}`;
   assert.equal((await fetch(`${base}/health`)).status, 200);
+  const page = await (await fetch(base)).text();
+  const faviconPath = page.match(/<link\b[^>]*rel="icon"[^>]*href="([^"]+)"/)?.[1];
+  assert.ok(faviconPath, 'De startpagina verwijst naar een favicon');
+  const favicon = await fetch(new URL(faviconPath, base));
+  assert.equal(favicon.status, 200);
+  assert.equal(favicon.headers.get('content-type'), 'image/svg+xml');
+  assert.equal(await favicon.text(), await readFile('public/favicon.svg', 'utf8'));
   const text = await (await fetch(`${base}/api/dashboard`)).text();
   assert.ok(!text.includes('SECRET_MUST_NOT_LEAK') && !text.includes('NEVER_PUBLIC'));
   const post = (data, headers = {}) => fetch(`${base}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Dashboard-Request': '1', ...headers }, body: JSON.stringify(data) });

@@ -119,7 +119,7 @@ export async function createApp({ env = process.env, config, ha } = {}) {
       if (req.method !== 'GET') return json(res, 404, { error: 'Niet gevonden' });
       const file = resolve(root, '.' + decodeURIComponent(path === '/' ? '/index.html' : path));
       if (!file.startsWith(root + '/') || !(await stat(file).catch(() => null))?.isFile()) return json(res, 404, { error: 'Niet gevonden' });
-      const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png' };
+      const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml' };
       res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }); res.end(await readFile(file));
     } catch (e) {
       // Never log request URLs, upstream response bodies or tokens.
