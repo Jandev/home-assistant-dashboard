@@ -1,3 +1,4 @@
+import { houseRooms, houseState } from './house.js';
 import { measurement, power, numeric, localDate, midnight, addDays, namesIn } from './utils.js';
 import { powerColumns } from './history.js';
 
@@ -18,6 +19,8 @@ export function entityView(s) {
   const a = s.attributes;
   return { id: s.entity_id, name: a.friendly_name || s.entity_id, state: s.state, available: available(s), updatedAt: s.last_updated,
     unit: a.unit_of_measurement, deviceClass: a.device_class, brightness: a.brightness,
+    color: a.rgb_color ? '#' + a.rgb_color.map(v => Math.round(v).toString(16).padStart(2, '0')).join('') : '#ffffff',
+    colorable: a.supported_color_modes?.some(mode => ['xy', 'hs', 'rgb', 'rgbw', 'rgbww'].includes(mode)),
     dimmable: a.supported_color_modes?.some(mode => mode !== 'onoff'),
     temperature: a.current_temperature, title: a.media_title, artist: a.media_artist,
     duration: a.media_duration, position: a.media_position, positionUpdatedAt: a.media_position_updated_at,
@@ -90,13 +93,13 @@ export class Dashboard {
     const directHome = power(get(e.home));
     const home = directHome ?? (e.deriveHome && solar !== null && grid !== null && solar + grid >= 0 ? solar + grid : null);
     const directConsumption = solar === 0 ? 0 : solar !== null && grid !== null ? Math.max(0, solar - Math.max(0, -grid)) : null;
-    const rooms = ha.rooms();
+    const rooms = houseRooms(ha, c);
     const ids = new Set([...rooms.flatMap(r => r.entities), ...c.quickActions.flatMap(a => a.entities), ...c.speakers.map(s => s.entity), ...c.cameras.map(s => s.entity), ...[e.solar, e.grid, e.home, c.indoorTemperature], ...e.consumers]);
     const daily = this.daily.day === localDate() ? structuredClone(this.daily) : {};
     if (e.deriveHome && daily.solar && daily.import && daily.export && daily.solar.value + daily.import.value >= daily.export.value) daily.home = { value: daily.solar.value + daily.import.value - daily.export.value, unit: 'kWh', stale: [daily.solar, daily.import, daily.export].some(value => value.stale), updatedAt: [daily.solar, daily.import, daily.export].filter(value => value.stale).map(value => value.updatedAt).filter(Boolean).sort()[0] || daily.lastSuccessAt };
     return {
       location: c.location, calendarNames: c.calendarNames || [], connection: { live: ha.connected, lastSuccessAt: ha.lastSuccessAt, stale: !ha.lastSuccessAt || Date.now() - Date.parse(ha.lastSuccessAt) > 90000 },
-      entities: Object.fromEntries([...ids].filter(Boolean).map(id => [id, entityView(get(id))])),
+      entities: Object.fromEntries([...ids].filter(Boolean).map(id => [id, entityView(houseState(ha, c, id))])),
       rooms, quickActions: c.quickActions, speakers: c.speakers, cameras: c.cameras,
       scenes: [...ha.states.values()].filter(s => s.entity_id.startsWith('scene.')).map(entityView),
       temperature: measurement(get(c.indoorTemperature)),

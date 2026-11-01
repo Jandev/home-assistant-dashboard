@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { HomeAssistant } from '../server/ha.js';
+import { houseRooms, houseState } from '../server/house.js';
+import { createApp } from '../server/index.js';
+
+test('Huis verbergt oude apparaten en bedient een lampengroep en expliciete stekker', async t => {
+  const ha = new HomeAssistant(null, null), calls = [];
+  ha.connected = true;
+  ha.areas = [{ area_id: 'living', name: 'Woonkamer' }, { area_id: 'old', name: 'Eetkamer' }];
+  ha.entities = ['light.a', 'light.b', 'light.retired'].map(entity_id => ({ entity_id, area_id: 'living' }));
+  for (const id of ['light.a', 'light.b', 'light.retired', 'switch.heater']) ha.states.set(id, { entity_id: id, state: 'on', attributes: { brightness: 120, rgb_color: [12, 34, 56], supported_color_modes: ['xy'] } });
+  const config = { quickActions: [], speakers: [], house: { excludeRooms: ['old'], excludeEntities: ['light.retired'], roomEntities: { living: ['switch.heater'] }, lightGroups: [{ id: 'light.dashboard_group', name: 'Plafonnières', room: 'living', entities: ['light.a', 'light.b'] }] } };
+  assert.deepEqual(houseRooms(ha, config)[0].entities, ['light.dashboard_group', 'switch.heater']);
+  ha.service = async (...args) => calls.push(args); ha.refresh = async () => {};
+  const app = await createApp({ env: {}, config, ha });
+  await new Promise(r => app.server.listen(0, '127.0.0.1', r)); t.after(() => app.stop());
+  const post = (entity, action, value) => fetch(`http://127.0.0.1:${app.server.address().port}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Dashboard-Request': '1' }, body: JSON.stringify({ entity, action, value }) });
+  assert.equal((await post('light.dashboard_group', 'color', '#ff8000')).status, 200);
+  assert.deepEqual(calls.pop(), ['light', 'turn_on', { entity_id: ['light.a', 'light.b'], rgb_color: [255, 128, 0], brightness: 120 }]);
+  assert.equal((await post('light.dashboard_group', 'brightness', 45)).status, 200);
+  assert.deepEqual(calls.pop()[2], { entity_id: ['light.a', 'light.b'], brightness_pct: 45, rgb_color: [12, 34, 56] });
+  assert.equal((await post('switch.heater', 'off')).status, 200);
+  assert.deepEqual(calls.pop(), ['switch', 'turn_off', { entity_id: 'switch.heater' }]);
+  assert.equal((await post('switch.fridge', 'off')).status, 409);
+  assert.equal((await post('light.retired', 'off')).status, 409);
+  assert.equal((await post('light.dashboard_group', 'color', 'red')).status, 502);
+  ha.states.get('light.b').state = 'unavailable';
+  assert.equal(houseState(ha, config, 'light.dashboard_group').state, 'unavailable');
+  assert.equal((await post('light.dashboard_group', 'on')).status, 409);
+});

@@ -39,3 +39,24 @@ html,body{height:100%;overflow:hidden}.shell{height:100vh;height:100dvh;display:
 @media(max-width:800px){.energy .solar-summary{width:260px;padding:12px}.solar-reading>strong{font-size:21px}}
 .energy-period{display:block;font-size:11px;font-weight:400;margin-top:5px;line-height:1.4}
 .today .weather-symbol+h3{margin-top:18px}
+
+/* Shared room accents connect scene groups to their room cards. */
+.tone-sage{--room-accent:#507454;--room-tint:#eaf1e5}
+.tone-blue{--room-accent:#3c6c8b;--room-tint:#e8f1f8}
+.tone-lavender{--room-accent:#77618f;--room-tint:#f0eaf6}
+.tone-sand{--room-accent:#906a36;--room-tint:#f7eedf}
+.tone-rose{--room-accent:#985c70;--room-tint:#f7eaf0}
+.night .tone-sage{--room-accent:#b0cf9e;--room-tint:#2e4030}
+.night .tone-blue{--room-accent:#a2c9e5;--room-tint:#293e4c}
+.night .tone-lavender{--room-accent:#cdb5e6;--room-tint:#3b324a}
+.night .tone-sand{--room-accent:#e1c28c;--room-tint:#453b2b}
+.night .tone-rose{--room-accent:#e3afc1;--room-tint:#49313c}
+.house-scenes h2{margin-bottom:10px;font-size:18px}.scene-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;align-items:start}
+.scene-group{min-width:0;padding:10px;border-radius:14px;background:var(--room-tint);border-top:3px solid var(--room-accent)}
+.scene-group h3{display:flex;align-items:center;gap:9px;margin:0 0 8px;color:var(--room-accent);font-size:13px;min-height:20px}
+.room-color-dot{width:9px;height:9px;border-radius:50%;background:var(--room-accent);flex:none}
+.scene-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.scene-button{display:grid;grid-template-columns:16px minmax(0,1fr);align-items:center;gap:5px;width:100%;min-height:44px;text-align:left;padding:7px 8px;background:var(--card);border:1px solid var(--line);font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.scene-button>span:first-child{color:var(--room-accent);font-size:17px;text-align:center}
+.rooms .room[class*="tone-"]{border-top:3px solid var(--room-accent)}.room[class*="tone-"] .room-emblem{color:var(--room-accent);background:var(--room-tint)}
+
+.house-scenes{padding:16px}

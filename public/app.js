@@ -62,7 +62,7 @@ function toast(text) { $('#toast').textContent = text; $('#toast').hidden = fals
 function modal(title, html, mode = null) { releaseCameras($('#dialog-body')); dialogMode = mode; $('#dialog-title').textContent = title; $('#dialog-body').innerHTML = html; if (!$('dialog').open) $('dialog').showModal(); }
 function actionButton(action, index) {
   const scene = action.entities[0]?.startsWith('scene.'), on = action.entities.some(id => entity(id)?.state === 'on');
-  return `<button class="action ${on ? 'on' : ''}" data-quick="${index}" ${busy || action.entities.some(offline) ? 'disabled' : ''}><b>${scene ? '✧' : '☼'} ${esc(action.name)}</b><small>${action.entities.some(offline) ? 'Niet beschikbaar' : scene ? 'Scène uitvoeren' : action.action === 'off' ? 'Alle lampen uitzetten' : on ? 'Aan · tik om uit te zetten' : 'Uit · tik om aan te zetten'}</small></button>`;
+  return `<button class="action ${on ? 'on' : ''}" data-quick="${index}" ${busy || action.entities.some(offline) ? 'disabled' : ''}><b>${scene ? '✧' : '☼'} ${esc(action.name)}</b><small>${action.entities.some(offline) ? 'Niet beschikbaar' : scene ? 'Scène uitvoeren' : action.action === 'off' ? 'Alles uitzetten' : on ? 'Aan · tik om uit te zetten' : 'Uit · tik om aan te zetten'}</small></button>`;
 }
 function playerControls(compact = false) {
   const s = entity(speaker), disabled = offline(speaker) || busy;
@@ -112,12 +112,42 @@ function todayView() {
 function bulbIcon() {
   return '<svg viewBox="0 0 24 24" class="bulb-icon" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17h6M9 20h6M11 23h2M8.5 14.5a7 7 0 1 1 7 0c-1 .7-1.5 1.5-1.5 2.5h-4c0-1-.5-1.8-1.5-2.5Z"/><path d="M12 1V0M3 4 1.5 2.5M21 4l1.5-1.5"/></svg>';
 }
+function orderedRooms() {
+  const order = ['woonkamer', 'badkamer', 'kantoor', 'terras'];
+  const rank = room => { const index = order.indexOf(room.name.toLocaleLowerCase('nl')); return index < 0 ? order.length : index; };
+  return [...state.rooms].sort((a, b) => rank(a) - rank(b));
+}
+function sceneLabel(scene, room) {
+  const name = scene.name.trim(), prefix = room.name.trim();
+  if (name.toLocaleLowerCase('nl').startsWith(prefix.toLocaleLowerCase('nl')) && /^[\s:–—-]/.test(name.slice(prefix.length))) {
+    return name.slice(prefix.length).replace(/^[\s:–—-]+/, '') || name;
+  }
+  return name;
+}
+function roomTone(room) {
+  if (/woonkamer/i.test(room.name)) return 'sage';
+  if (/badkamer/i.test(room.name)) return 'blue';
+  if (/kantoor/i.test(room.name)) return 'lavender';
+  if (/terras|buiten|tuin/i.test(room.name)) return 'sand';
+  const tones = ['sage', 'blue', 'lavender', 'sand', 'rose'];
+  return tones[[...room.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % tones.length];
+}
+function roomScenesView() {
+  const groups = orderedRooms().map(room => ({ room, scenes: [] }));
+  for (const scene of state.scenes) {
+    const group = groups.find(g => g.room.entities.includes(scene.id)) || groups.find(g => scene.name.toLocaleLowerCase('nl').includes(g.room.name.toLocaleLowerCase('nl')));
+    if (group) group.scenes.push(scene);
+  }
+  const visible = groups.filter(g => g.scenes.length);
+  if (!visible.length) return '';
+  return `<section class="card wide house-scenes" aria-label="Scènes per kamer"><h2>Scènes</h2><div class="scene-groups">${visible.map(({ room, scenes }) => `<section class="scene-group tone-${roomTone(room)}" aria-label="Scènes ${esc(room.name)}"><h3><span class="room-color-dot" aria-hidden="true"></span>${esc(room.name)}</h3><div class="scene-buttons">${scenes.sort((a, b) => a.name.localeCompare(b.name, 'nl')).map(scene => `<button class="scene-button" title="${esc(scene.name)}" aria-label="${esc(scene.name)}" data-scene="${esc(scene.id)}" ${!scene.available || busy || !state.connection.live ? 'disabled' : ''}><span aria-hidden="true">✧</span><span>${esc(sceneLabel(scene, room))}</span></button>`).join('')}</div></section>`).join('')}</div></section>`;
+}
 function roomsView() {
-  return `<div class="grid rooms"><div class="card wide scene-row"><b>Scènes</b>${state.scenes.filter(s => /woonkamer/i.test(s.name)).map(s => `<button class="pill" data-scene="${esc(s.id)}" ${!s.available || busy || !state.connection.live ? 'disabled' : ''}>✧ ${esc(s.name)}</button>`).join('')}</div>${state.rooms.length ? state.rooms.map(r => {
-    const entities = r.entities.map(entity).filter(Boolean), temps = entities.filter(e => e.deviceClass === 'temperature' && e.available), lights = entities.filter(e => e.id.startsWith('light.'));
+  return `<div class="grid rooms">${roomScenesView()}${state.rooms.length ? orderedRooms().map(r => {
+    const entities = r.entities.map(entity).filter(Boolean), temps = entities.filter(e => e.deviceClass === 'temperature' && e.available), lights = entities.filter(e => /^(light|switch)\./.test(e.id));
     const lit = lights.filter(light => light.state === 'on').length;
     const glyph = /badkamer/i.test(r.name) ? '♨' : /kantoor/i.test(r.name) ? '▤' : /slaap/i.test(r.name) ? '☾' : /terras|buiten|tuin/i.test(r.name) ? '♧' : /eet|keuken/i.test(r.name) ? '☕' : '⌂';
-    return `<article class="card room ${lit ? 'room-lit' : ''}" aria-label="${esc(r.name)}"><button class="room-heading" data-room="${esc(r.id)}" aria-label="Open ${esc(r.name)}"><span class="room-emblem" aria-hidden="true">${glyph}</span><span><h2>${esc(r.name)}</h2><span class="room-summary">${lit ? `${lit} ${lit === 1 ? 'lamp aan' : 'lampen aan'}` : lights.length ? 'Alle lampen uit' : 'Apparaten en scènes'}${temps.length ? ` · ${esc(temps[0].state)} ${esc(temps[0].unit)}` : ''}</span></span><span class="room-arrow" aria-hidden="true">↗</span></button><div class="room-lamps">${lights.slice(0, 3).map(light => `<button class="room-lamp ${light.state === 'on' ? 'lamp-on' : ''}" data-light="${esc(light.id)}" aria-label="${esc(light.name)} ${light.state === 'on' ? 'uitzetten' : 'aanzetten'}" aria-pressed="${light.state === 'on'}" title="${esc(light.name)}" ${offline(light.id) || busy ? 'disabled' : ''}>${bulbIcon()}<span class="lamp-name">${esc(light.name)}</span><small>${offline(light.id) ? 'Offline' : light.state === 'on' ? 'Aan' : 'Uit'}</small></button>`).join('') || '<p class="note">Geen lampen in deze kamer.</p>'}</div><button class="room-more" data-room="${esc(r.id)}">${lights.length > 3 ? `Alle ${lights.length} lampen en apparaten` : 'Alle apparaten en dimmers'} <span aria-hidden="true">→</span></button></article>`;
+    return `<article class="card room tone-${roomTone(r)} ${lit ? 'room-lit' : ''}" aria-label="${esc(r.name)}"><button class="room-heading" data-room="${esc(r.id)}" aria-label="Open ${esc(r.name)}"><span class="room-emblem" aria-hidden="true">${glyph}</span><span><h2>${esc(r.name)}</h2><span class="room-summary">${lit ? `${lit} ${lit === 1 ? 'apparaat aan' : 'apparaten aan'}` : lights.length ? 'Alles uit' : 'Apparaten en scènes'}${temps.length ? ` · ${esc(temps[0].state)} ${esc(temps[0].unit)}` : ''}</span></span><span class="room-arrow" aria-hidden="true">↗</span></button><div class="room-lamps">${lights.slice(0, 3).map(light => `<button class="room-lamp ${light.state === 'on' ? 'lamp-on' : ''}" data-light="${esc(light.id)}" aria-label="${esc(light.name)} ${light.state === 'on' ? 'uitzetten' : 'aanzetten'}" aria-pressed="${light.state === 'on'}" title="${esc(light.name)}" ${offline(light.id) || busy ? 'disabled' : ''}>${bulbIcon()}<span class="lamp-name">${esc(light.name)}</span><small>${offline(light.id) ? 'Offline' : light.state === 'on' ? 'Aan' : 'Uit'}</small></button>`).join('') || '<p class="note">Geen lampen in deze kamer.</p>'}</div><button class="room-more" data-room="${esc(r.id)}">${lights.length > 3 ? `Alle ${lights.length} lampen en apparaten` : 'Alle apparaten en dimmers'} <span aria-hidden="true">→</span></button></article>`;
   }).join('') : `<article class="card wide">${empty('Geen kamerindeling beschikbaar. Koppel apparaten aan gebieden in Home Assistant; de server probeert automatisch opnieuw te verbinden.')}</article>`}</div>`;
 }
 function energyView() {
@@ -213,13 +243,13 @@ async function load() {
 }
 async function perform(fn, message = 'Opdracht verstuurd') {
   busy = true;
-  document.querySelectorAll('[data-quick],[data-media],[data-scene],[data-light],[data-brightness],[data-volume]').forEach(b => b.disabled = true);
+  document.querySelectorAll('[data-quick],[data-media],[data-scene],[data-light],[data-brightness],[data-color],[data-volume]').forEach(b => b.disabled = true);
   try { await fn(); toast(message); } catch (e) { toast(e.message); }
   finally { busy = false; await load(); if ($('dialog').open && dialogMode === 'room') updateRoom(); }
 }
 function renderRoom(id) {
   selectedRoom = id; const room = state.rooms.find(r => r.id === id); if (!room) return;
-  const html = room.entities.map(entity).filter(Boolean).map(e => `<div class="room-control"><div><span><b>${esc(e.name)}</b><br><small data-room-state="${esc(e.id)}">${esc(e.state)} ${esc(e.unit || '')}</small></span>${e.id.startsWith('light.') ? `<button data-light="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}>${e.state === 'on' ? 'Uitzetten' : 'Aanzetten'}</button>` : e.id.startsWith('scene.') ? `<button data-scene="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}>Uitvoeren</button>` : ''}</div>${e.dimmable ? `<label>Helderheid<input type="range" min="0" max="100" value="${Math.round((e.brightness || 0) / 255 * 100)}" aria-label="Helderheid ${esc(e.name)}" data-brightness="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}></label>` : ''}${/^(climate|cover|fan)\./.test(e.id) ? '<small>Alleen statusweergave voor dit apparaat.</small>' : ''}</div>`).join('');
+  const html = room.entities.map(entity).filter(Boolean).map(e => `<div class="room-control"><div><span><b>${esc(e.name)}</b><br><small data-room-state="${esc(e.id)}">${esc(e.state)} ${esc(e.unit || '')}</small></span>${/^(light|switch)\./.test(e.id) ? `<button data-light="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}>${e.state === 'on' ? 'Uitzetten' : 'Aanzetten'}</button>` : e.id.startsWith('scene.') ? `<button data-scene="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}>Uitvoeren</button>` : ''}</div>${e.dimmable ? `<label>Helderheid<input type="range" min="0" max="100" value="${Math.round((e.brightness || 0) / 255 * 100)}" aria-label="Helderheid ${esc(e.name)}" data-brightness="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}></label>` : ''}${e.colorable ? `<label>Kleur<input type="color" value="${esc(e.color)}" aria-label="Kleur ${esc(e.name)}" data-color="${esc(e.id)}" ${offline(e.id) || busy ? 'disabled' : ''}></label>` : ''}${/^(climate|cover|fan)\./.test(e.id) ? '<small>Alleen statusweergave voor dit apparaat.</small>' : ''}</div>`).join('');
   modal(room.name, html || empty('Geen apparaten beschikbaar'), 'room');
 }
 function updateRoom() {
@@ -234,6 +264,7 @@ function updateRoom() {
     input.disabled = busy || offline(input.dataset.brightness);
     if (document.activeElement !== input) input.value = Math.round((entity(input.dataset.brightness)?.brightness || 0) / 255 * 100);
   });
+  $('#dialog-body').querySelectorAll('[data-color]').forEach(input => { input.disabled = busy || offline(input.dataset.color); if (document.activeElement !== input) input.value = entity(input.dataset.color)?.color || '#ffffff'; });
   $('#dialog-body').querySelectorAll('[data-scene]').forEach(button => button.disabled = busy || offline(button.dataset.scene));
 }
 function showConsumers() {
@@ -331,6 +362,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', event => {
   if (event.target.hasAttribute('data-volume')) setVolume(event.target);
+  if (event.target.dataset.color) perform(() => api('/api/action', { entity: event.target.dataset.color, action: 'color', value: event.target.value }));
   if (event.target.dataset.brightness) perform(() => api('/api/action', { entity: event.target.dataset.brightness, action: 'brightness', value: Number(event.target.value) }));
 });
 document.addEventListener('submit', event => { if (event.target.id === 'search-form') { event.preventDefault(); musicResults('search', new FormData(event.target).get('query')); } });

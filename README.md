@@ -65,3 +65,9 @@ Zorg dat `config/dashboard.json` op de Docker-host bestaat. Haal updates op met:
 docker compose pull home-assistant-dashboard
 docker compose up -d home-assistant-dashboard
 ```
+
+## Huis aanpassen
+
+Met `house` in `config/dashboard.json` kun je kamers (`excludeRooms`, gebied-ID’s) en oude lampen (`excludeEntities`, entiteit-ID’s) verbergen. Via `roomEntities` voeg je specifieke stekkers en scènes aan een kamer toe; alleen deze stekkers krijgen bediening. `lightGroups` bundelt lampen tot één dashboardknop met een gezamenlijke dimmer en kleurkiezer (als alle lampen kleur ondersteunen). Zie de voorbeeldconfiguratie voor de structuur.
+
+De groepering geldt voor opdrachten vanuit dit dashboard. Voor synchronisatie bij bediening via andere apps of fysieke schakelaars is ook een groep/automatisering in Home Assistant nodig. De eigen configuratie is niet opgenomen in Git; neem deze bij uitrollen apart over op de Docker-host.

@@ -1,25 +1,73 @@
 {
   "location": "Voorbeeldplaats",
   "calendar": "calendar.demo_household",
-  "calendarNames": ["Alex", "Riley", "Casey", "Jordan"],
+  "calendarNames": [
+    "Alex",
+    "Riley",
+    "Casey",
+    "Jordan"
+  ],
   "weather": null,
   "indoorTemperature": null,
   "quickActions": [
-    { "name": "Badkamer uit", "action": "off", "entities": ["light.demo_bathroom_mirror", "light.demo_bathroom_ceiling"] },
-    { "name": "Leeslamp", "entities": ["light.demo_reading_lamp"] },
-    { "name": "Avondscène", "entities": ["scene.demo_evening"] },
-    { "name": "Woonkamer uit", "entities": ["scene.demo_living_room_off"] }
+    {
+      "name": "Badkamer uit",
+      "action": "off",
+      "entities": [
+        "light.demo_bathroom_mirror",
+        "light.demo_bathroom_ceiling"
+      ]
+    },
+    {
+      "name": "Leeslamp",
+      "entities": [
+        "light.demo_reading_lamp"
+      ]
+    },
+    {
+      "name": "Avondsc\u00e8ne",
+      "entities": [
+        "scene.demo_evening"
+      ]
+    },
+    {
+      "name": "Woonkamer uit",
+      "entities": [
+        "scene.demo_living_room_off"
+      ]
+    }
   ],
   "speakers": [
-    { "name": "Eetkamer", "entity": "media_player.demo_dining_room" },
-    { "name": "TV", "entity": "media_player.demo_tv" }
+    {
+      "name": "Eetkamer",
+      "entity": "media_player.demo_dining_room"
+    },
+    {
+      "name": "TV",
+      "entity": "media_player.demo_tv"
+    }
   ],
   "cameras": [
-    { "name": "NVR · kanaal 2", "entity": "camera.demo_nvr_channel_2" },
-    { "name": "NVR · kanaal 1", "entity": "camera.demo_nvr_channel_1" },
-    { "name": "NVR · kanaal 3", "entity": "camera.demo_nvr_channel_3" },
-    { "name": "NVR · kanaal 4", "entity": "camera.demo_nvr_channel_4" },
-    { "name": "NVR · kanaal 5", "entity": "camera.demo_nvr_channel_5" }
+    {
+      "name": "NVR \u00b7 kanaal 2",
+      "entity": "camera.demo_nvr_channel_2"
+    },
+    {
+      "name": "NVR \u00b7 kanaal 1",
+      "entity": "camera.demo_nvr_channel_1"
+    },
+    {
+      "name": "NVR \u00b7 kanaal 3",
+      "entity": "camera.demo_nvr_channel_3"
+    },
+    {
+      "name": "NVR \u00b7 kanaal 4",
+      "entity": "camera.demo_nvr_channel_4"
+    },
+    {
+      "name": "NVR \u00b7 kanaal 5",
+      "entity": "camera.demo_nvr_channel_5"
+    }
   ],
   "musicAssistantEntryId": null,
   "energy": {
@@ -39,6 +87,36 @@
       "sensor.demo_office_power",
       "sensor.demo_laundry_power",
       "sensor.demo_media_power"
+    ]
+  },
+  "house": {
+    "excludeRooms": [
+      "demo_unused_room"
+    ],
+    "excludeEntities": [
+      "light.demo_retired_lamp"
+    ],
+    "roomEntities": {
+      "demo_office": [
+        "switch.demo_office_power"
+      ],
+      "demo_bathroom": [
+        "switch.demo_heater",
+        "scene.demo_bathroom_on",
+        "scene.demo_bathroom_off"
+      ]
+    },
+    "lightGroups": [
+      {
+        "id": "light.dashboard_ceiling",
+        "name": "Plafonni\u00e8res",
+        "room": "demo_living_room",
+        "entities": [
+          "light.demo_ceiling_1",
+          "light.demo_ceiling_2",
+          "light.demo_ceiling_3"
+        ]
+      }
     ]
   }
 }

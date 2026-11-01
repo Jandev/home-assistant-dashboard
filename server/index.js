@@ -1,3 +1,4 @@
+import { houseRooms, houseState } from './house.js';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -15,7 +16,7 @@ export async function createApp({ env = process.env, config, ha } = {}) {
   const waste = new WasteCalendar(env.AFVALKALENDER_ADRESS, env.DATA_DIR || './data');
   const weather = new Weather(ha, config.weather, env.WEATHER_LATITUDE, env.WEATHER_LONGITUDE);
   const dashboard = new Dashboard(ha, config);
-  const allowedIds = () => new Set([...config.quickActions.flatMap(a => a.entities), ...ha.rooms().flatMap(r => r.entities), ...[...ha.states.keys()].filter(id => id.startsWith('scene.')), ...config.speakers.map(s => s.entity)]);
+  const allowedIds = () => new Set([...config.quickActions.flatMap(a => a.entities), ...houseRooms(ha, config).flatMap(r => r.entities), ...[...ha.states.keys()].filter(id => id.startsWith('scene.')), ...config.speakers.map(s => s.entity)]);
   const root = resolve('dist');
   function json(res, status, value) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); }
   async function body(req) {
@@ -50,17 +51,32 @@ export async function createApp({ env = process.env, config, ha } = {}) {
         if (!req.headers['content-type']?.startsWith('application/json') || req.headers['x-dashboard-request'] !== '1' || (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host)) return json(res, 403, { error: 'Aanvraag niet toegestaan' });
         const data = await body(req);
         if (path === '/api/action') {
-          const { entity, action, value } = data, s = ha.states.get(entity), domain = entity?.split('.')[0];
+          const { entity, action, value } = data, s = houseState(ha, config, entity), domain = entity?.split('.')[0];
           if (!allowedIds().has(entity) || !available(s) || !ha.connected) return json(res, 409, { error: 'Apparaat is niet beschikbaar voor bediening' });
-          let service, payload = { entity_id: entity };
-          if (domain === 'light' && ['on', 'off', 'brightness'].includes(action)) {
+          const group = config.house?.lightGroups?.find(g => g.id === entity);
+          let service, payload = { entity_id: group ? group.entities : entity };
+          if (domain === 'light' && ['on', 'off', 'brightness', 'color'].includes(action)) {
             service = action === 'off' ? 'turn_off' : 'turn_on';
             if (action === 'brightness') { if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('Ongeldige dimwaarde'); payload.brightness_pct = value; }
           }
+          if (domain === 'light' && action === 'color') {
+            if (!/^#[0-9a-f]{6}$/i.test(value) || !s.attributes.supported_color_modes?.some(m => ['xy', 'hs', 'rgb', 'rgbw', 'rgbww'].includes(m))) throw new Error('Ongeldige kleur');
+            payload.rgb_color = [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
+          }
+          if (domain === 'switch' && ['on', 'off'].includes(action)) service = action === 'on' ? 'turn_on' : 'turn_off';
           if (domain === 'scene' && action === 'activate') service = 'turn_on';
           if (domain === 'media_player' && config.speakers.some(p => p.entity === entity)) {
             service = { play: 'media_play', pause: 'media_pause', next: 'media_next_track', previous: 'media_previous_track', volume: 'volume_set' }[action];
             if (action === 'volume') { if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('Ongeldig volume'); payload.volume_level = value; }
+          }
+          if (group && service === 'turn_on') {
+            if (action !== 'brightness' && Number.isFinite(s.attributes.brightness)) payload.brightness = s.attributes.brightness;
+            if (action !== 'color') {
+              const a = s.attributes;
+              if (a.color_mode === 'color_temp' && Number.isFinite(a.color_temp_kelvin)) payload.color_temp_kelvin = a.color_temp_kelvin;
+              else if (a.rgb_color) payload.rgb_color = a.rgb_color;
+              else if (a.xy_color) payload.xy_color = a.xy_color;
+            }
           }
           if (!service) return json(res, 400, { error: 'Bediening wordt niet ondersteund' });
           await ha.service(domain, service, payload); await ha.refresh();
