@@ -1,3 +1,5 @@
+import { isUpcoming } from './calendar.js';
+
 const $ = selector => document.querySelector(selector);
 const titles = ['Je energie in beeld', 'Een fijn huis', 'Welkom thuis', 'Tijd voor muziek', 'Een blik naar buiten'];
 const pages = ['Energie', 'Huis', 'Vandaag', 'Muziek', 'Camera’s'], icons = ['↯', '⌂', '◷', '♫', '▣'];
@@ -68,10 +70,11 @@ function playerControls(compact = false) {
 }
 function artwork(s, className) { return s?.artwork ? `<img class="${className}" src="${esc(s.artwork)}" alt="Albumhoes">` : `<div class="${className}" aria-hidden="true">♫</div>`; }
 function agenda(limit) {
-  const events = state.calendar.events;
-  if (!events.length) return empty(state.calendar.error || 'Geen afspraken vandaag. Even tijd voor elkaar.');
+  const now = new Date();
+  const events = state.calendar.events.map((event, index) => ({ event, index })).filter(({ event }) => isUpcoming(event, now));
+  if (!events.length) return empty(state.calendar.error || 'Geen komende afspraken. Even tijd voor elkaar.');
   let lastDay;
-  return events.slice(0, limit).map((e, i) => {
+  return events.slice(0, limit).map(({ event: e, index: i }) => {
     const day = e.allDay ? e.start : dayOf(e.start), heading = day !== lastDay ? `<div class="day">${esc(dayLabel(day))}</div>` : ''; lastDay = day;
     const names = e.names || [], color = names.length === 1 ? agendaColor(names[0]) : '';
     return `${heading}<button class="event ${color}" data-event="${i}"><time>${e.allDay ? 'Hele dag' : time(e.start)}</time><div><b>${esc(e.title)}</b><p>${esc(e.location || (e.allDay ? 'Dagevenement' : e.end ? `Tot ${time(e.end)}` : ''))}</p>${names.length > 1 ? names.map(n => `<span class="badge ${agendaColor(n)}">${esc(n)}</span>`).join('') : ''}</div></button>`;
@@ -104,7 +107,7 @@ function wasteSummary() {
 }
 function todayView() {
   const limit = window.innerHeight < 780 ? 3 : 5;
-  return `<div class="grid today"><article class="card"><div class="eyebrow" id="date"></div><div class="time" id="clock"></div><p>Fijn dat je thuis bent.</p>${weatherView()}</article><article class="card"><h2>De gezinsagenda</h2>${agenda(limit)}<button class="pill full" data-agenda>Alle afspraken →</button>${state.calendar.error ? `<p class="note error">${esc(state.calendar.error)} · ${updated(state.calendar.lastSuccessAt)}</p>` : ''}</article><article class="card"><h2>Even regelen</h2><div class="actions">${state.quickActions.map(actionButton).join('')}</div>${playerControls(true)}<button class="pill full" data-page="3">Open muziek →</button></article></div><div class="status">${state.temperature.value !== null ? `<span>♨ Binnentemperatuur <b>${fmt(state.temperature.value, state.temperature.unit)}</b></span>` : `<span>↔ ${state.energy.grid < 0 ? 'Teruglevering' : 'Netafname'} <b>${watts(state.energy.grid)}</b></span>`}<span>↯ Verbruik <b>${watts(state.energy.home)}</b></span><button class="waste-summary" data-waste aria-label="Open afvalkalender">♧ ${wasteSummary()}${state.waste.stale ? ' · verouderd' : ''}</button></div>`;
+  return `<div class="grid today"><article class="card"><div class="eyebrow" id="date"></div><div class="time" id="clock"></div><p>Fijn dat je thuis bent.</p>${weatherView()}</article><article class="card"><h2>De gezinsagenda</h2><div data-agenda-list="${limit}">${agenda(limit)}</div><button class="pill full" data-agenda>Alle afspraken →</button>${state.calendar.error ? `<p class="note error">${esc(state.calendar.error)} · ${updated(state.calendar.lastSuccessAt)}</p>` : ''}</article><article class="card"><h2>Even regelen</h2><div class="actions">${state.quickActions.map(actionButton).join('')}</div>${playerControls(true)}<button class="pill full" data-page="3">Open muziek →</button></article></div><div class="status">${state.temperature.value !== null ? `<span>♨ Binnentemperatuur <b>${fmt(state.temperature.value, state.temperature.unit)}</b></span>` : `<span>↔ ${state.energy.grid < 0 ? 'Teruglevering' : 'Netafname'} <b>${watts(state.energy.grid)}</b></span>`}<span>↯ Verbruik <b>${watts(state.energy.home)}</b></span><button class="waste-summary" data-waste aria-label="Open afvalkalender">♧ ${wasteSummary()}${state.waste.stale ? ' · verouderd' : ''}</button></div>`;
 }
 function bulbIcon() {
   return '<svg viewBox="0 0 24 24" class="bulb-icon" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17h6M9 20h6M11 23h2M8.5 14.5a7 7 0 1 1 7 0c-1 .7-1.5 1.5-1.5 2.5h-4c0-1-.5-1.8-1.5-2.5Z"/><path d="M12 1V0M3 4 1.5 2.5M21 4l1.5-1.5"/></svg>';
@@ -182,6 +185,10 @@ function connectionStatus() {
 }
 function duration(seconds) { return Number.isFinite(seconds) ? `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}` : '—'; }
 function tick() {
+  if (state) document.querySelectorAll('[data-agenda-list]').forEach(list => {
+    const html = agenda(Number(list.dataset.agendaList));
+    if (list.innerHTML !== html) list.innerHTML = html;
+  });
   if ($('#clock')) $('#clock').textContent = time(new Date());
   if ($('#date')) $('#date').textContent = new Intl.DateTimeFormat('nl-NL', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
   const s = entity(speaker);
@@ -300,7 +307,7 @@ document.addEventListener('click', async event => {
   if (b.hasAttribute('data-consumers')) showConsumers();
   if (b.hasAttribute('data-energy-readings')) showEnergyReadings();
   if (b.hasAttribute('data-weather')) showWeather();
-  if (b.hasAttribute('data-agenda')) modal('Agenda Gezin', agenda(state.calendar.events.length) + `<p class="note">${updated(state.calendar.lastSuccessAt)} · komende 14 dagen</p>`, 'agenda');
+  if (b.hasAttribute('data-agenda')) modal('Agenda Gezin', `<div data-agenda-list="Infinity">${agenda(Infinity)}</div><p class="note">${updated(state.calendar.lastSuccessAt)} · komende 14 dagen vanaf nu</p>`, 'agenda');
   if (b.dataset.event !== undefined) { const e = state.calendar.events[Number(b.dataset.event)]; modal(e.title, `<p>${esc(dayLabel(e.allDay ? e.start : dayOf(e.start)))} · ${e.allDay ? 'Hele dag' : `${time(e.start)}${e.end ? ` – ${time(e.end)}` : ''}`}</p><p>${esc(e.location)}</p><p>${esc(e.description)}</p>`); }
   if (b.dataset.history) showHistory(b.dataset.history);
   if (b.hasAttribute('data-library')) musicResults('library');
