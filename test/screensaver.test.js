@@ -33,9 +33,24 @@ test('screensaver maakt ontbrekende HEIC-converter duidelijk zonder padinformati
   const root = await mkdtemp(join(tmpdir(), 'dashboard-photos-'));
   try {
     await writeFile(join(root, 'photo.heic'), 'fake HEIC');
-    const saver = createScreensaver({ photoDirectory: root, dataDirectory: join(root, 'cache'), heifConvert: join(root, 'missing-heif-convert') });
+    const errors = [];
+    const saver = createScreensaver({ photoDirectory: root, dataDirectory: join(root, 'cache'), heifConvert: join(root, 'missing-heif-convert'), logger: { error: (...args) => errors.push(args) } });
     const [photo] = await saver.scan();
     await assert.rejects(saver.convert(photo.id), error => error.statusCode === 503 && /heif-convert beschikbaar is in PATH/.test(error.publicMessage));
+    assert.deepEqual(errors[0][1], { operation: 'render', stage: 'heic-convert', code: 'ENOENT', photoId: photo.id });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('screensaver logt een scanfout zonder hostpaden', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dashboard-photos-'));
+  try {
+    const notDirectory = join(root, 'not-a-directory');
+    await writeFile(notDirectory, 'file');
+    const errors = [];
+    const saver = createScreensaver({ photoDirectory: notDirectory, dataDirectory: join(root, 'cache'), logger: { error: (...args) => errors.push(args) } });
+    await assert.rejects(saver.scan(), error => error.code === 'ENOTDIR');
+    assert.deepEqual(errors[0][1], { operation: 'scan', stage: 'photo-directory-read', code: 'ENOTDIR' });
+    assert.equal(JSON.stringify(errors).includes(root), false);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

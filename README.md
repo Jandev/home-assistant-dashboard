@@ -47,6 +47,7 @@ Maak op de Docker-host een eigen configuratie en `.env` aan; zet nooit tokens of
 services:
   home-assistant-dashboard:
     image: ghcr.io/jandev/home-assistant-dashboard:latest
+    user: "${PUID:-1000}:${PGID:-1000}"
     environment:
       HOMEASSISTANT_URL: ${HOMEASSISTANT_URL:?Stel HOMEASSISTANT_URL in}
       HOMEASSISTANT_API_KEY: ${HOMEASSISTANT_API_KEY:?Stel HOMEASSISTANT_API_KEY in}
@@ -69,6 +70,14 @@ volumes:
 Maak naast `config/` een map `photos/` op de Docker-host en plaats daar de foto’s in (submappen worden ook doorzocht). De map wordt read-only gekoppeld. JPEG-, PNG- en HEIC-bestanden worden door de container naar maximaal 1920×1200 JPEG’s geconverteerd, met EXIF-oriëntatie toegepast. De cache staat in `dashboard-data` en de originele foto’s blijven ongewijzigd. Zet in `config/dashboard.json` de instellingen onder `screensaver`; [config/dashboard.example.json](config/dashboard.example.json) bevat de volledige standaardinstelling. De fotoscreensaver start na 120 seconden zonder invoer en wisselt standaard elke 15 seconden van foto. De klok, datum en weersinformatie verplaatsen iedere minuut naar een andere schermhoek.
 
 De nachtperiode is standaard 23:00–07:00 in `Europe/Amsterdam`. In Fully Kiosk Browser gebruikt het dashboard `fully.turnScreenOff()` en `fully.turnScreenOn()` als die JavaScript-interface beschikbaar is; configureer Fully daarnaast om aanraking het scherm te laten wekken. In andere browsers toont het dashboard een zwart scherm. ’s Nachts aanraken toont het dashboard twee minuten, waarna het nachtscherm terugkeert. Overdag sluit aanraken de fotoscreensaver en blijft de huidige dashboardpagina staan.
+
+### Screensaver op Synology controleren
+
+Bekijk de servermeldingen met `docker logs --tail 100 dashboard`. Screensaverfouten vermelden de stap (`photo-directory-read`, `photo-stat`, `heic-convert`, `ffmpeg` of `cache-read`) en foutcode, zonder fotopaden of bestandsnamen te loggen. `EACCES` betekent dat de containergebruiker geen toegang heeft tot de fotomap, een bovenliggende map of het cachevolume. `No supported photos found` betekent dat de gekoppelde map leeg is, niet bestaat of geen ondersteunde foto’s bevat.
+
+Compose start de container als de numerieke gebruiker en groep uit `PUID` en `PGID` (standaard `1000:1000`). Je hoeft dus geen account met de naam `node` op Synology aan te maken. Zet de IDs in het `.env`-bestand naast `compose.yaml`; haal ze op met `id <DSM-gebruikersnaam>`. Alleen `PUID` en `PGID` onder de Compose-sectie `environment:` zetten verandert de uitvoergebruiker niet.
+
+Controleer dat de hostmap in Compose naar de map met foto’s wijst en op `/app/photos` is gekoppeld. De ingestelde UID/GID moet de mappen kunnen doorlopen en de fotobestanden kunnen lezen; read-only (`:ro`) is geschikt. Dezelfde UID/GID moet schrijfrechten hebben op het bestaande `dashboard-data`-volume dat aan `/app/data` hangt. Na het wijzigen van PUID/PGID kan het nodig zijn de eigenaar van dat volume aan te passen.
 
 Zorg dat `config/dashboard.json` op de Docker-host bestaat. Haal updates op met:
 

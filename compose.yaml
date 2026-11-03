@@ -2,6 +2,7 @@ services:
   home-assistant-dashboard:
     image: ghcr.io/jandev/home-assistant-dashboard:latest
     build: .
+    user: "${PUID:-1000}:${PGID:-1000}"
     environment:
       HOMEASSISTANT_URL: ${HOMEASSISTANT_URL:-${HOMEASSISTANT_ADDRESS:-}}
       HOMEASSISTANT_API_KEY: ${HOMEASSISTANT_API_KEY:?Stel HOMEASSISTANT_API_KEY in}

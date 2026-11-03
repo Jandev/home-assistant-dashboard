@@ -48,8 +48,11 @@ export async function createApp({ env = process.env, config, ha } = {}) {
         if (!screensaverConfig.enabled) return json(res, 404, { error: 'Screensaver uitgeschakeld' });
         const id = path.slice('/api/screensaver/image/'.length);
         const file = await screensaver.convert(id);
+        let bytes;
+        try { bytes = await readFile(file); }
+        catch (error) { screensaver.logFailure('render', error, { photoId: id, stage: 'cache-read' }); throw error; }
         res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
-        return res.end(await readFile(file));
+        return res.end(bytes);
       }
       if (req.method === 'GET' && path === '/api/history') return json(res, 200, await dashboard.history(url.searchParams.get('period') || 'day'));
       if (req.method === 'GET' && /^\/api\/(camera|artwork)\//.test(path)) {
