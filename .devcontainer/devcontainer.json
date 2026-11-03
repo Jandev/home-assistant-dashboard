@@ -1,6 +1,12 @@
 {
   "name": "Home Assistant Dashboard",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "remoteEnv": {
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+  },
   "forwardPorts": [5173, 8080],
   "customizations": {
     "vscode": {

@@ -14,6 +14,9 @@ export class HomeAssistant {
   }
   service(domain, service, data, response = false) { return this.request(`services/${domain}/${service}${response ? '?return_response' : ''}`, data); }
   hasService(domain, service) { return !!this.services.find(s => s.domain === domain)?.services?.[service]; }
+  closeSocket(socket) {
+    if (socket && (socket.readyState === 0 || socket.readyState === 1)) socket.close();
+  }
   async refresh() {
     const states = await this.request('states');
     if (!Array.isArray(states)) throw new Error('Ongeldige Home Assistant-status');
@@ -35,13 +38,16 @@ export class HomeAssistant {
     this.connect();
     this.poll = setInterval(() => { if (!this.connected) this.refresh().catch(() => {}); }, 30000);
     this.heartbeat = setInterval(() => {
-      if (this.connected) this.command('ping').then(() => { this.lastSuccessAt = new Date().toISOString(); }).catch(() => this.socket?.close());
+      if (this.connected) {
+        const socket = this.socket;
+        this.command('ping').then(() => { this.lastSuccessAt = new Date().toISOString(); }).catch(() => this.closeSocket(socket));
+      }
     }, 30000);
   }
   connect() {
     if (this.stopped) return;
     const socket = this.socket = new WebSocket(`${this.base.replace(/^http/, 'ws')}/api/websocket`);
-    const timeout = setTimeout(() => socket.close(), 15000);
+    const timeout = setTimeout(() => this.closeSocket(socket), 15000);
     socket.addEventListener('message', async ({ data }) => {
       let message; try { message = JSON.parse(data); } catch { return; }
       if (message.type === 'auth_required') socket.send(JSON.stringify({ type: 'auth', access_token: this.token }));
@@ -56,7 +62,7 @@ export class HomeAssistant {
           ['areas', 'entities', 'devices', 'services'].forEach((key, i) => { if (results[i].status === 'fulfilled') this[key] = results[i].value; });
         } catch { /* REST fallback and reconnect keep old states visible. */ }
       }
-      if (message.type === 'auth_invalid') socket.close();
+      if (message.type === 'auth_invalid') this.closeSocket(socket);
       if (message.type === 'result' || message.type === 'pong') {
         const p = this.pending.get(message.id);
         if (p) { clearTimeout(p.timer); this.pending.delete(message.id); message.success || message.type === 'pong' ? p.resolve(message.result) : p.reject(new Error('Home Assistant ondersteunt deze aanvraag niet')); }
@@ -67,7 +73,10 @@ export class HomeAssistant {
         this.lastSuccessAt = new Date().toISOString();
       }
     });
-    socket.addEventListener('error', () => socket.close());
+    socket.addEventListener('error', () => {
+      // WebSocket emits close after a connection error. Calling close here can
+      // recursively emit error in Node's Undici WebSocket implementation.
+    });
     socket.addEventListener('close', () => {
       clearTimeout(timeout); this.connected = false;
       for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error('Verbinding verbroken')); }
@@ -75,7 +84,7 @@ export class HomeAssistant {
       if (!this.stopped) { this.reconnect = setTimeout(() => this.connect(), this.retry); this.retry = Math.min(60000, this.retry * 2); }
     });
   }
-  stop() { this.stopped = true; clearInterval(this.poll); clearInterval(this.heartbeat); clearTimeout(this.reconnect); this.socket?.close(); }
+  stop() { this.stopped = true; clearInterval(this.poll); clearInterval(this.heartbeat); clearTimeout(this.reconnect); this.closeSocket(this.socket); }
   rooms() {
     return this.areas.map(area => {
       const ids = this.entities.filter(e => !e.disabled_by && (e.area_id === area.area_id || (!e.area_id && this.devices.find(d => d.id === e.device_id)?.area_id === area.area_id))).map(e => e.entity_id);

@@ -8,6 +8,7 @@ COPY src/assets/house-energy.png ./src/assets/house-energy.png
 RUN npm run build
 
 FROM node:22-alpine AS runtime
+RUN apk add --no-cache ffmpeg libheif-tools
 ENV NODE_ENV=production PORT=8080 DATA_DIR=/app/data CONFIG_FILE=/app/config/dashboard.json
 WORKDIR /app
 COPY --from=build --chown=node:node /app/dist ./dist

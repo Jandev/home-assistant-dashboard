@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseAddress, selectAddress, normalizeWaste, WasteCalendar } from '../server/waste.js';
@@ -85,14 +85,38 @@ test('gebieden volgen entity- en device-registry; infrastructuur-LEDs worden weg
   ha.entities = [{ entity_id: 'light.lamp', device_id: 'device' }, { entity_id: 'light.router_led', device_id: 'device' }, { entity_id: 'light.disabled', area_id: 'woonkamer', disabled_by: 'user' }];
   assert.deepEqual(ha.rooms()[0].entities, ['light.lamp']);
 });
+test('WebSocket-fout laat close-event reconnect afhandelen zonder recursieve close', () => {
+  const NativeWebSocket = globalThis.WebSocket, sockets = [];
+  class FakeWebSocket extends EventTarget {
+    readyState = 0;
+    closeCalls = 0;
+    constructor() { super(); sockets.push(this); }
+    close() { this.closeCalls++; this.readyState = 3; }
+  }
+  globalThis.WebSocket = FakeWebSocket;
+  const ha = new HomeAssistant('http://example.org', 'secret');
+  try {
+    ha.start();
+    sockets[0].dispatchEvent(new Event('error'));
+    assert.equal(sockets[0].closeCalls, 0);
+    sockets[0].readyState = 3;
+    sockets[0].dispatchEvent(new Event('close'));
+  } finally {
+    ha.stop();
+    globalThis.WebSocket = NativeWebSocket;
+  }
+});
 const config = { location: 'Home', calendar: 'calendar.example', indoorTemperature: null, weather: null, quickActions: [{ name: 'Lamp', entities: ['light.test'] }], speakers: [{ name: 'Speaker', entity: 'media_player.test' }], cameras: [], energy: { solar: 'sensor.solar', grid: 'sensor.grid', gridPositiveIsImport: true, deriveHome: false, consumers: [] } };
 test('HTTP-grens beschermt geheimen, bestanden en apparaatbediening', async t => {
+  const photoRoot = await mkdtemp(join(tmpdir(), 'dashboard-http-'));
+  await writeFile(join(photoRoot, 'private-photo-name.jpg'), 'image');
   const calls = [], ha = new HomeAssistant('http://example.org', 'SECRET_MUST_NOT_LEAK');
   ha.connected = true; ha.lastSuccessAt = new Date().toISOString();
   ha.states.set('light.test', { entity_id: 'light.test', state: 'off', attributes: { friendly_name: '<Lamp>', access_token: 'NEVER_PUBLIC' } });
   ha.service = async (...args) => { calls.push(args); }; ha.refresh = async () => {};
-  const app = await createApp({ env: {}, config, ha });
+  const app = await createApp({ env: { DATA_DIR: join(photoRoot, 'data') }, config: { ...config, screensaver: { photoDirectory: photoRoot } }, ha });
   await new Promise(r => app.server.listen(0, '127.0.0.1', r)); t.after(() => app.stop());
+  t.after(() => rm(photoRoot, { recursive: true, force: true }));
   const base = `http://127.0.0.1:${app.server.address().port}`;
   assert.equal((await fetch(`${base}/health`)).status, 200);
   const page = await (await fetch(base)).text();
@@ -104,6 +128,16 @@ test('HTTP-grens beschermt geheimen, bestanden en apparaatbediening', async t =>
   assert.equal(await favicon.text(), await readFile('public/favicon.svg', 'utf8'));
   const text = await (await fetch(`${base}/api/dashboard`)).text();
   assert.ok(!text.includes('SECRET_MUST_NOT_LEAK') && !text.includes('NEVER_PUBLIC'));
+  const screenSettings = JSON.parse(text).screensaver;
+  assert.equal(screenSettings.enabled, true);
+  assert.equal(screenSettings.idleSeconds, 120);
+  assert.equal(screenSettings.nightMode.startTime, '23:00');
+  assert.ok(!JSON.stringify(screenSettings).includes(photoRoot));
+  const photoResponse = await fetch(`${base}/api/screensaver/photos`);
+  const photos = await photoResponse.json();
+  assert.equal(photos.length, 1);
+  assert.ok(!JSON.stringify(photos).includes('private-photo-name'));
+  assert.equal((await fetch(`${base}/api/screensaver/image/invalid`)).status, 404);
   const post = (data, headers = {}) => fetch(`${base}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Dashboard-Request': '1', ...headers }, body: JSON.stringify(data) });
   assert.equal((await post({ entity: 'switch.fridge', action: 'off' })).status, 409);
   assert.equal((await post({ entity: 'light.test', action: 'on' }, { Origin: 'http://evil.example' })).status, 403);

@@ -21,6 +21,12 @@ npm start
 
 Open `http://localhost:8080`. Ontwikkelen kan met `npm run dev`. De optionele browsercontrole vereist Playwright; zie `npm run test:browser`.
 
+Met `npm start` of `npm run dev` gebruikt de screensaver automatisch de map `photos/` in de repository. In Docker blijft de geconfigureerde map `/app/photos`, gekoppeld aan `./photos` op de host.
+
+Voor lokale beeldconversie moeten `ffmpeg` en `heif-convert` beschikbaar zijn in `PATH`; de Docker-image bevat beide hulpprogramma’s. Als een benodigde converter ontbreekt, geeft de foto-endpoint nu aan welke executable ontbreekt.
+
+De VS Code-taak `Lokaal: starten en testen` bouwt en start de Docker Compose-container op `http://localhost:8090`; stop de voorgrondtaak met Ctrl+C. In de devcontainer moet Docker-toegang eenmalig worden geïnstalleerd via **Dev Containers: Rebuild Container**. Rechtstreeks `docker compose up` gebruikt ook hostpoort 8090.
+
 ## Instellingen
 
 `.env.example` beschrijft de beschikbare omgevingsvariabelen. Gebruik een Home Assistant-weather-entiteit of vul `WEATHER_LATITUDE` en `WEATHER_LONGITUDE` in voor Open-Meteo. Stel in de configuratie onder meer agenda, snelle acties, speakers, camera’s en energiemeters in. Zie [config/dashboard.example.json](config/dashboard.example.json) voor de structuur.
@@ -53,11 +59,16 @@ services:
     volumes:
       - dashboard-data:/app/data
       - ./config/dashboard.json:/app/config/dashboard.json:ro
+      - ./photos:/app/photos:ro
     restart: unless-stopped
 
 volumes:
   dashboard-data:
 ```
+
+Maak naast `config/` een map `photos/` op de Docker-host en plaats daar de foto’s in (submappen worden ook doorzocht). De map wordt read-only gekoppeld. JPEG-, PNG- en HEIC-bestanden worden door de container naar maximaal 1920×1200 JPEG’s geconverteerd, met EXIF-oriëntatie toegepast. De cache staat in `dashboard-data` en de originele foto’s blijven ongewijzigd. Zet in `config/dashboard.json` de instellingen onder `screensaver`; [config/dashboard.example.json](config/dashboard.example.json) bevat de volledige standaardinstelling. De fotoscreensaver start na 120 seconden zonder invoer en wisselt standaard elke 15 seconden van foto. De klok, datum en weersinformatie verplaatsen iedere minuut naar een andere schermhoek.
+
+De nachtperiode is standaard 23:00–07:00 in `Europe/Amsterdam`. In Fully Kiosk Browser gebruikt het dashboard `fully.turnScreenOff()` en `fully.turnScreenOn()` als die JavaScript-interface beschikbaar is; configureer Fully daarnaast om aanraking het scherm te laten wekken. In andere browsers toont het dashboard een zwart scherm. ’s Nachts aanraken toont het dashboard twee minuten, waarna het nachtscherm terugkeert. Overdag sluit aanraken de fotoscreensaver en blijft de huidige dashboardpagina staan.
 
 Zorg dat `config/dashboard.json` op de Docker-host bestaat. Haal updates op met:
 

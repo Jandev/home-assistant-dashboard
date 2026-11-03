@@ -5,6 +5,7 @@ const titles = ['Je energie in beeld', 'Een fijn huis', 'Welkom thuis', 'Tijd vo
 const pages = ['Energie', 'Huis', 'Vandaag', 'Muziek', 'Camera’s'], icons = ['↯', '⌂', '◷', '♫', '▣'];
 const tz = 'Europe/Amsterdam';
 let page = 2, state, speaker, busy = false, dialogMode = null, selectedRoom, cameraTimer;
+let screensaverTimer, slideTimer, infoPositionTimer, saverPosition = 0, saverPhotos = [], photoBag = [], lastPhoto = null, nightTemporaryUntil = 0, nightModeActive = false, nightScreenRequested = false;
 let lastRenderedPage = -1;
 let favorites = null, favoriteRequest = false;
 const pendingVolumes = new Map();
@@ -318,6 +319,105 @@ async function musicResults(kind, query) {
   catch (e) { if (dialogMode === 'music') $('#dialog-body').innerHTML = empty(e.message); }
 }
 function navigate(next) { page = Math.max(0, Math.min(4, next)); volumeEditing = false; render(); window.scrollTo({ top: 0 }); }
+function screenNightNow(date = new Date()) {
+  const cfg = state?.screensaver?.nightMode;
+  if (!cfg?.enabled) return false;
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: cfg.timezone || tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+  const minute = value => { const [hour, min] = value.split(':').map(Number); return hour * 60 + min; };
+  const now = minute(parts), start = minute(cfg.startTime || '23:00'), end = minute(cfg.endTime || '07:00');
+  return start > end ? now >= start || now < end : now >= start && now < end;
+}
+function screenSaverClock() {
+  const date = new Date(), clock = $('#screensaver-clock'), dateNode = $('#screensaver-date');
+  if (clock) clock.textContent = new Intl.DateTimeFormat('nl-NL', { timeZone: state.screensaver.nightMode.timezone || tz, hour: '2-digit', minute: '2-digit' }).format(date);
+  if (dateNode) dateNode.textContent = new Intl.DateTimeFormat('nl-NL', { timeZone: state.screensaver.nightMode.timezone || tz, weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  if (clock) clock.hidden = !state.screensaver.showClock;
+  if (dateNode) dateNode.hidden = !state.screensaver.showClock;
+  const weather = $('#screensaver-weather'), current = state.weather?.current;
+  if (weather) weather.textContent = state.screensaver.showWeather && current ? `${forecastCondition(current).icon} ${fmt(current.temperature, '°', 0)} · ${state.location}` : '';
+}
+async function fetchSaverPhotos(force = false) {
+  if (saverPhotos.length && !force) return saverPhotos;
+  const response = await fetch('/api/screensaver/photos', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Foto’s niet beschikbaar');
+  saverPhotos = await response.json(); return saverPhotos;
+}
+function shufflePhotoBag() {
+  photoBag = saverPhotos.map((_, index) => index);
+  for (let i = photoBag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [photoBag[i], photoBag[j]] = [photoBag[j], photoBag[i]]; }
+  if (photoBag.length > 1 && saverPhotos[photoBag[photoBag.length - 1]]?.id === lastPhoto) [photoBag[0], photoBag[photoBag.length - 1]] = [photoBag[photoBag.length - 1], photoBag[0]];
+}
+async function nextSaverPhoto() {
+  const image = $('#screensaver-photo');
+  try {
+    await fetchSaverPhotos();
+    if (!saverPhotos.length) { $('#screensaver-status').textContent = 'Plaats JPEG-, PNG- of HEIC-foto’s in de fotomap.'; return; }
+    if (!photoBag.length) { if (lastPhoto) await fetchSaverPhotos(true); shufflePhotoBag(); }
+    const photo = saverPhotos[photoBag.pop()]; lastPhoto = photo.id;
+    const next = new Image(); next.decoding = 'async';
+    next.onload = () => {
+      image.src = next.src; image.classList.remove('kenburns');
+      if (state.screensaver.transition === 'kenburns') { void image.offsetWidth; image.classList.add('kenburns'); }
+    };
+    next.onerror = () => { $('#screensaver-status').textContent = 'Deze foto kon niet worden verwerkt.'; };
+    next.src = photo.url;
+    $('#screensaver-status').textContent = '';
+    const nextIndex = photoBag.length ? photoBag[photoBag.length - 1] : saverPhotos.findIndex(item => item.id !== photo.id);
+    const preload = saverPhotos[nextIndex];
+    if (preload && preload.id !== photo.id) { const ahead = new Image(); ahead.src = preload.url; }
+  } catch { $('#screensaver-status').textContent = 'Fotoserver niet beschikbaar.'; }
+}
+function showSaver() {
+  if (!state?.screensaver?.enabled || $('#screensaver').hidden === false) return;
+  $('#screensaver').hidden = false; moveSaverInfo(); screenSaverClock(); nextSaverPhoto();
+  $('#screensaver-photo').style.setProperty('--slide-seconds', `${Math.max(5, state.screensaver.slideSeconds || 15)}s`);
+  clearInterval(slideTimer); slideTimer = setInterval(nextSaverPhoto, Math.max(5, state.screensaver.slideSeconds || 15) * 1000);
+  clearInterval(infoPositionTimer); infoPositionTimer = setInterval(moveSaverInfo, 60000);
+}
+function moveSaverInfo() { saverPosition = (saverPosition + 1) % 4; $('#screensaver').dataset.position = String(saverPosition); }
+function hideSaver() { $('#screensaver').hidden = true; clearInterval(slideTimer); clearInterval(infoPositionTimer); slideTimer = infoPositionTimer = null; }
+function screenModeTick() {
+  if (!state?.screensaver) return;
+  screenSaverClock();
+  const night = screenNightNow();
+  if (night) {
+    hideSaver(); clearTimeout(screensaverTimer); screensaverTimer = null;
+    if (nightTemporaryUntil > Date.now()) { $('#night-screen').hidden = true; return; }
+    $('#night-screen').hidden = false;
+    if (!nightModeActive) { nightModeActive = true; nightScreenRequested = false; }
+    const fully = window.fully;
+    if (state.screensaver.nightMode.screenOff && !nightScreenRequested && typeof fully?.turnScreenOff === 'function') {
+      nightScreenRequested = true;
+      try { fully.turnScreenOff(); } catch { /* Black-screen fallback remains active. */ }
+    }
+  } else {
+    $('#night-screen').hidden = true;
+    if (nightModeActive) { nightModeActive = false; nightScreenRequested = false; nightTemporaryUntil = 0; resetSaverIdle(); }
+    if ($('#screensaver').hidden && !screensaverTimer && state.screensaver.enabled) resetSaverIdle();
+  }
+}
+function resetSaverIdle() {
+  clearTimeout(screensaverTimer); screensaverTimer = null;
+  if (!state?.screensaver?.enabled || screenNightNow() || !$('#screensaver').hidden) return;
+  screensaverTimer = setTimeout(showSaver, Math.max(15, state.screensaver.idleSeconds || 120) * 1000);
+}
+document.addEventListener('pointerdown', event => {
+  const inNight = !$('#night-screen').hidden, inSaver = !$('#screensaver').hidden;
+  if (inNight || inSaver) {
+    event.preventDefault(); event.stopImmediatePropagation();
+    hideSaver(); $('#screensaver').hidden = true;
+    if (inNight && state?.screensaver?.nightMode?.wakeOnTouch) {
+      nightTemporaryUntil = Date.now() + 120000;
+      nightModeActive = true; nightScreenRequested = false;
+      try { if (typeof window.fully?.turnScreenOn === 'function') window.fully.turnScreenOn(); } catch { /* Dashboard is shown with the black-screen overlay fallback. */ }
+      $('#night-screen').hidden = true;
+    }
+    resetSaverIdle(); return;
+  }
+  if (screenNightNow()) nightTemporaryUntil = Date.now() + 120000;
+  else resetSaverIdle();
+}, true);
+document.addEventListener('keydown', () => { if ($('#screensaver').hidden && $('#night-screen').hidden) { if (screenNightNow()) nightTemporaryUntil = Date.now() + 120000; else resetSaverIdle(); } }, true);
 document.addEventListener('click', async event => {
   const b = event.target.closest('button'); if (!b || b.disabled) return;
   if (b.id === 'home') navigate(2);
@@ -421,4 +521,4 @@ $('#content').addEventListener('touchstart', e => { start = null; if (!e.target.
 $('#content').addEventListener('touchend', e => { if (!start) return; const dx = e.changedTouches[0].clientX - start.x, dy = e.changedTouches[0].clientY - start.y; if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) navigate(page + (dx < 0 ? 1 : -1)); start = null; }, { passive: true });
 function themeLabel() { $('#theme').textContent = document.body.classList.contains('night') ? '☀ Warm wonen' : '☾ Avondrust'; }
 try { document.body.classList.toggle('night', localStorage.getItem('theme') === 'night'); } catch { /* Browser storage may be disabled. */ }
-themeLabel(); await load(); let lastPoll = 0; setInterval(() => { if (!document.hidden && !busy && (dialogMode === 'room' || Date.now() - lastPoll >= 5000)) { lastPoll = Date.now(); load(); } }, 1000); setInterval(tick, 1000);
+themeLabel(); await load(); resetSaverIdle(); screenModeTick(); let lastPoll = 0; setInterval(() => { screenModeTick(); if (!document.hidden && !busy && (dialogMode === 'room' || Date.now() - lastPoll >= 5000)) { lastPoll = Date.now(); load(); } }, 1000); setInterval(tick, 1000);

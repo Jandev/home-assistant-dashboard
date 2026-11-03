@@ -5,6 +5,7 @@ data
 node_modules
 dist
 generated_images
+photos
 .devcontainer
 docs
 config/dashboard.json

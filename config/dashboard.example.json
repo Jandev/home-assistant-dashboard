@@ -1,4 +1,21 @@
 {
+  "screensaver": {
+    "enabled": true,
+    "idleSeconds": 120,
+    "slideSeconds": 15,
+    "transition": "kenburns",
+    "showClock": true,
+    "showWeather": true,
+    "photoDirectory": "/app/photos",
+    "nightMode": {
+      "enabled": true,
+      "startTime": "23:00",
+      "endTime": "07:00",
+      "timezone": "Europe/Amsterdam",
+      "screenOff": true,
+      "wakeOnTouch": true
+    }
+  },
   "location": "Voorbeeldplaats",
   "calendar": "calendar.demo_household",
   "calendarNames": [

@@ -60,3 +60,14 @@ html,body{height:100%;overflow:hidden}.shell{height:100vh;height:100dvh;display:
 .rooms .room[class*="tone-"]{border-top:3px solid var(--room-accent)}.room[class*="tone-"] .room-emblem{color:var(--room-accent);background:var(--room-tint)}
 
 .house-scenes{padding:16px}
+.screensaver,#night-screen{position:fixed;inset:0;z-index:10000;background:#000;overflow:hidden;touch-action:manipulation}.screensaver>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}.screensaver>img.kenburns{animation:screensaver-kenburns 15s ease-in-out both}.screensaver-shade{position:absolute;inset:45% 0 0;background:linear-gradient(transparent,#0009)}#screensaver-clock{position:absolute;left:5vw;bottom:12vh;color:#fff;font-size:clamp(48px,11vw,150px);font-weight:300;letter-spacing:-.04em;text-shadow:0 2px 22px #0008}#screensaver-date,#screensaver-weather{position:absolute;left:5.5vw;bottom:7vh;color:#fff;font-size:clamp(16px,2.2vw,27px);text-shadow:0 2px 15px #0009}#screensaver-weather{left:auto;right:5vw;bottom:8vh;text-align:right}.screensaver-status{position:absolute;top:3vh;left:4vw;color:#fff;font-size:14px;text-shadow:0 2px 10px #000}#screensaver[hidden],#night-screen[hidden]{display:none!important}@keyframes screensaver-kenburns{from{transform:scale(1)}to{transform:scale(1.12)}}
+.screensaver>img.kenburns{animation-duration:var(--slide-seconds,15s)}
+#screensaver[data-position="1"] #screensaver-clock{top:7vh;right:auto;bottom:auto;left:5vw}
+#screensaver[data-position="1"] #screensaver-date{top:clamp(120px,16vw,200px);right:auto;bottom:auto;left:5.5vw;text-align:left}
+#screensaver[data-position="1"] #screensaver-weather{top:8vh;bottom:auto}
+#screensaver[data-position="2"] #screensaver-clock{top:7vh;right:5vw;bottom:auto;left:auto;text-align:right}
+#screensaver[data-position="2"] #screensaver-date{top:clamp(120px,16vw,200px);right:5.5vw;bottom:auto;left:auto;text-align:right}
+#screensaver[data-position="2"] #screensaver-weather{top:8vh;right:auto;bottom:auto;left:5vw;text-align:left}
+#screensaver[data-position="3"] #screensaver-clock{right:5vw;bottom:12vh;left:auto;text-align:right}
+#screensaver[data-position="3"] #screensaver-date{right:5.5vw;bottom:7vh;left:auto;text-align:right}
+#screensaver[data-position="3"] #screensaver-weather{right:auto;bottom:8vh;left:5vw;text-align:left}

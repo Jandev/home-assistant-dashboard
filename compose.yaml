@@ -1,6 +1,7 @@
 services:
   home-assistant-dashboard:
     image: ghcr.io/jandev/home-assistant-dashboard:latest
+    build: .
     environment:
       HOMEASSISTANT_URL: ${HOMEASSISTANT_URL:-${HOMEASSISTANT_ADDRESS:-}}
       HOMEASSISTANT_API_KEY: ${HOMEASSISTANT_API_KEY:?Stel HOMEASSISTANT_API_KEY in}
@@ -9,10 +10,11 @@ services:
       WEATHER_LONGITUDE: ${WEATHER_LONGITUDE:-}
       TZ: Europe/Amsterdam
     ports:
-      - "8090:8080"
+      - "${DASHBOARD_PORT:-8090}:8080"
     volumes:
       - dashboard-data:/app/data
-      - ./config/dashboard.json:/app/config/dashboard.json:ro
+      - ${LOCAL_WORKSPACE_FOLDER:-.}/config/dashboard.json:/app/config/dashboard.json:ro
+      - ${LOCAL_WORKSPACE_FOLDER:-.}/photos:/app/photos:ro
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

@@ -9,6 +9,7 @@ import { Dashboard, available } from './dashboard.js';
 import { WasteCalendar } from './waste.js';
 import { Weather } from './weather.js';
 import { musicSource } from './music.js';
+import { createScreensaver, resolvePhotoDirectory } from './screensaver.js';
 
 export async function createApp({ env = process.env, config, ha } = {}) {
   config ||= JSON.parse(await readFile(env.CONFIG_FILE || 'config/dashboard.json', 'utf8'));
@@ -16,6 +17,9 @@ export async function createApp({ env = process.env, config, ha } = {}) {
   const waste = new WasteCalendar(env.AFVALKALENDER_ADRESS, env.DATA_DIR || './data');
   const weather = new Weather(ha, config.weather, env.WEATHER_LATITUDE, env.WEATHER_LONGITUDE);
   const dashboard = new Dashboard(ha, config);
+  const screensaverConfig = { enabled: true, idleSeconds: 120, slideSeconds: 15, transition: 'kenburns', showClock: true, showWeather: true, photoDirectory: '/app/photos', ...config.screensaver,
+    nightMode: { enabled: true, startTime: '23:00', endTime: '07:00', timezone: 'Europe/Amsterdam', screenOff: true, wakeOnTouch: true, ...config.screensaver?.nightMode } };
+  const screensaver = createScreensaver({ photoDirectory: resolvePhotoDirectory(screensaverConfig.photoDirectory), dataDirectory: env.DATA_DIR || './data' });
   const allowedIds = () => new Set([...config.quickActions.flatMap(a => a.entities), ...houseRooms(ha, config).flatMap(r => r.entities), ...[...ha.states.keys()].filter(id => id.startsWith('scene.')), ...config.speakers.map(s => s.entity)]);
   const root = resolve('dist');
   function json(res, status, value) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); }
@@ -30,7 +34,23 @@ export async function createApp({ env = process.env, config, ha } = {}) {
     try {
       const url = new URL(req.url, 'http://dashboard.local'), path = url.pathname;
       if (req.method === 'GET' && path === '/health') return json(res, 200, { status: 'ok' });
-      if (req.method === 'GET' && path === '/api/dashboard') return json(res, 200, dashboard.view(waste, weather));
+      if (req.method === 'GET' && path === '/api/dashboard') return json(res, 200, { ...dashboard.view(waste, weather), screensaver: {
+        enabled: screensaverConfig.enabled, idleSeconds: screensaverConfig.idleSeconds, slideSeconds: screensaverConfig.slideSeconds,
+        transition: screensaverConfig.transition, showClock: screensaverConfig.showClock, showWeather: screensaverConfig.showWeather,
+        nightMode: screensaverConfig.nightMode
+      } });
+      if (req.method === 'GET' && path === '/api/screensaver/photos') {
+        if (!screensaverConfig.enabled) return json(res, 404, { error: 'Screensaver uitgeschakeld' });
+        res.setHeader('Cache-Control', 'no-store');
+        return json(res, 200, await screensaver.scan());
+      }
+      if (req.method === 'GET' && path.startsWith('/api/screensaver/image/')) {
+        if (!screensaverConfig.enabled) return json(res, 404, { error: 'Screensaver uitgeschakeld' });
+        const id = path.slice('/api/screensaver/image/'.length);
+        const file = await screensaver.convert(id);
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' });
+        return res.end(await readFile(file));
+      }
       if (req.method === 'GET' && path === '/api/history') return json(res, 200, await dashboard.history(url.searchParams.get('period') || 'day'));
       if (req.method === 'GET' && /^\/api\/(camera|artwork)\//.test(path)) {
         const [, , kind, encoded] = path.split('/'), id = decodeURIComponent(encoded);
@@ -123,7 +143,7 @@ export async function createApp({ env = process.env, config, ha } = {}) {
       res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }); res.end(await readFile(file));
     } catch (e) {
       // Never log request URLs, upstream response bodies or tokens.
-      json(res, 502, { error: e.message?.startsWith('Bron geeft HTTP') ? e.message : 'Aanvraag mislukt. Controleer de koppeling of configuratie.' });
+      json(res, e.statusCode || 502, { error: e.publicMessage || (e.message?.startsWith('Bron geeft HTTP') ? e.message : 'Aanvraag mislukt. Controleer de koppeling of configuratie.') });
     }
   });
   const mediaItems = new Map();

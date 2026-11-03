@@ -40,12 +40,13 @@
     },
     {
       "label": "Lokaal: starten en testen",
-      "type": "npm",
-      "script": "dev",
-      "dependsOn": "Lokaal: controleren en bouwen",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "up", "--build"],
+      "options": { "cwd": "${workspaceFolder}" },
       "isBackground": true,
       "problemMatcher": {
-        "owner": "dashboard",
+        "owner": "dashboard-docker",
         "pattern": {
           "regexp": "^(.*):(\\d+):(\\d+):\\s+(.*)$",
           "file": 1,
@@ -55,8 +56,8 @@
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "^.*node --watch.*$",
-          "endsPattern": "^Dashboard luistert op poort [0-9]+$"
+          "beginsPattern": "^.*docker compose up --build.*$",
+          "endsPattern": "^.*Dashboard luistert op poort 8080$"
         }
       },
       "group": { "kind": "build", "isDefault": true },
