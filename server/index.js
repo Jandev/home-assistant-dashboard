@@ -134,8 +134,18 @@ export async function createApp({ env = process.env, config, ha } = {}) {
         }
         if (path === '/api/music/play') {
           if (!config.speakers.some(s => s.entity === data.entity) || !mediaItems.has(data.uri) || !available(ha.states.get(data.entity)) || !ha.connected || !ha.hasService('music_assistant', 'play_media')) return json(res, 409, { error: 'Kies een beschikbaar muziekresultaat en een online speaker' });
-          const item = mediaItems.get(data.uri);
-          await ha.service('music_assistant', 'play_media', { entity_id: data.entity, media_id: item.uri, media_type: item.type, enqueue: 'replace' });
+          const item = mediaItems.get(data.uri), mode = data.mode ?? 'track';
+          if (!['track', 'radio'].includes(mode)) return json(res, 400, { error: 'Ongeldige afspeelmodus' });
+          if (mode === 'radio' && item.type !== 'track') return json(res, 400, { error: 'Kies een nummer om een radiomix te starten' });
+          if (mode === 'radio' && !ha.isMusicPlayer(data.entity)) return json(res, 409, { error: 'Kies de Music Assistant-entiteit van deze speaker in de dashboardconfiguratie' });
+          if (mode === 'radio' && !ha.supportsRadio()) return json(res, 501, { error: 'Deze Home Assistant-koppeling ondersteunt geen radiomodus. Controleer de Music Assistant-integratie.' });
+          if (musicRequests.has(data.entity)) return json(res, 409, { error: 'Er wordt al muziek gestart op deze speaker' });
+          musicRequests.add(data.entity);
+          try {
+            await ha.service('music_assistant', 'play_media', { entity_id: data.entity, media_id: item.uri, media_type: item.type, enqueue: 'replace', ...(mode === 'radio' ? { radio_mode: true } : {}) });
+          } catch {
+            return json(res, 502, { error: mode === 'radio' ? 'Radiomix kon niet worden bevestigd. Controleer de speaker en of de muziekbron vergelijkbare nummers ondersteunt. Bekijk de wachtrij voordat je opnieuw probeert.' : 'Afspelen kon niet worden bevestigd. Controleer de speaker en de wachtrij voordat je opnieuw probeert.' });
+          } finally { musicRequests.delete(data.entity); }
           return json(res, 200, { accepted: true });
         }
       }
@@ -149,7 +159,7 @@ export async function createApp({ env = process.env, config, ha } = {}) {
       json(res, e.statusCode || 502, { error: e.publicMessage || (e.message?.startsWith('Bron geeft HTTP') ? e.message : 'Aanvraag mislukt. Controleer de koppeling of configuratie.') });
     }
   });
-  const mediaItems = new Map();
+  const mediaItems = new Map(), musicRequests = new Set();
   let libraryCache;
   const timers = [];
   return { server, ha, waste, weather, dashboard,

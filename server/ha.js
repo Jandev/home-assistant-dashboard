@@ -91,6 +91,11 @@ export class HomeAssistant {
       return { id: area.area_id, name: area.name, entities: ids.filter(id => (!id.endsWith('_led') && /^(light|scene|climate|cover|fan)\./.test(id)) || this.states.get(id)?.attributes.device_class === 'temperature') };
     }).filter(a => a.entities.length);
   }
+  isMusicPlayer(entity) { return this.entities.some(e => e.entity_id === entity && e.platform === 'music_assistant' && !e.disabled_by); }
+  supportsRadio() {
+    const service = this.services.find(s => s.domain === 'music_assistant')?.services?.play_media;
+    return !!service?.fields && Object.hasOwn(service.fields, 'radio_mode');
+  }
   musicEntry(speakers) {
     return this.entities.find(e => speakers.some(s => s.entity === e.entity_id) && e.platform === 'music_assistant')?.config_entry_id;
   }

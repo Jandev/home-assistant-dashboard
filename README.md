@@ -91,3 +91,13 @@ docker compose up -d home-assistant-dashboard
 Met `house` in `config/dashboard.json` kun je kamers (`excludeRooms`, gebied-ID’s) en oude lampen (`excludeEntities`, entiteit-ID’s) verbergen. Via `roomEntities` voeg je specifieke stekkers en scènes aan een kamer toe; alleen deze stekkers krijgen bediening. `lightGroups` bundelt lampen tot één dashboardknop met een gezamenlijke dimmer en kleurkiezer (als alle lampen kleur ondersteunen). Zie de voorbeeldconfiguratie voor de structuur.
 
 De groepering geldt voor opdrachten vanuit dit dashboard. Voor synchronisatie bij bediening via andere apps of fysieke schakelaars is ook een groep/automatisering in Home Assistant nodig. De eigen configuratie is niet opgenomen in Git; neem deze bij uitrollen apart over op de Docker-host.
+
+## Radiomix vanuit een nummer
+
+Zoek op de muziekpagina een nummer en kies **Start radiomix** naast het resultaat. De mix speelt op de geselecteerde speaker en vervangt de bestaande wachtrij. Gewoon een nummer of favoriete playlist afspelen blijft beschikbaar.
+
+De knop vereist een online speaker waarvan de geconfigureerde entiteit van de Music Assistant-integratie is, en een `music_assistant.play_media`-service die het veld `radio_mode` aanbiedt. Kies de Music Assistant-entiteit in `speakers[].entity`, niet de gelijknamige native Sonos-entiteit. Je bestaande Home Assistant-token blijft voldoende. De muziekprovider moet vergelijkbare nummers ondersteunen; Apple Music ondersteunt dit volgens de Music Assistant-documentatie. Alleen lokale bestanden hebben niet vanzelf aanbevelingen.
+
+Het dashboard meldt dat de opdracht is geaccepteerd en controleert maximaal drie keer op een volgend nummer wanneer de wachtrijservice beschikbaar is. Die informatie bewijst niet dat een nummer uit de aangevraagde mix komt. Bij een fout of timeout wordt de afspeelopdracht niet automatisch herhaald; controleer eerst de wachtrij. De mix wordt niet als benoemde playlist opgeslagen.
+
+`node scripts/music-browser-check.mjs` voert een geïsoleerde tablet-/mobiele UI-controle uit met Playwright en gesimuleerde muziekaanvragen, zonder Home Assistant te verbinden of apparaten te bedienen. Optioneel: `PLAYWRIGHT_MODULE` voor het modulepad en `CHROMIUM_PATH` voor een browserexecutable.

@@ -105,7 +105,7 @@ export class Dashboard {
       temperature: measurement(get(c.indoorTemperature)),
       energy: { solar, solarAssumedZero, directConsumption, grid, home, daily, consumers: e.consumers.map(id => ({ name: get(id)?.attributes.friendly_name || id, ...measurement(get(id)) })), allConsumers: [...ha.states.values()].filter(s => s.entity_id.startsWith('sensor.') && s.attributes.device_class === 'power' && ['W', 'kW'].includes(s.attributes.unit_of_measurement) && ![e.solar, e.grid, e.home].includes(s.entity_id) && !/fase|phase/i.test(s.entity_id + ' ' + s.attributes.friendly_name)).map(s => ({ id: s.entity_id, name: s.attributes.friendly_name || s.entity_id, ...measurement(s) })).sort((a,b) => a.name.localeCompare(b.name, 'nl')), updatedAt: ha.lastSuccessAt },
       calendar: this.calendar, weather: weather.view(), waste: waste.view(),
-      music: { search: ha.hasService('music_assistant', 'search') && !!(c.musicAssistantEntryId || ha.musicEntry(c.speakers)), library: ha.hasService('music_assistant', 'get_library') && !!(c.musicAssistantEntryId || ha.musicEntry(c.speakers)), queue: ha.hasService('music_assistant', 'get_queue') }
+      music: { radio: ha.supportsRadio(), radioSpeakers: c.speakers.filter(s => ha.isMusicPlayer(s.entity)).map(s => s.entity), search: ha.hasService('music_assistant', 'search') && !!(c.musicAssistantEntryId || ha.musicEntry(c.speakers)), library: ha.hasService('music_assistant', 'get_library') && !!(c.musicAssistantEntryId || ha.musicEntry(c.speakers)), queue: ha.hasService('music_assistant', 'get_queue') }
     };
   }
 }

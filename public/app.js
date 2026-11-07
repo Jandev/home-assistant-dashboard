@@ -243,10 +243,11 @@ async function load() {
   }
 }
 async function perform(fn, message = 'Opdracht verstuurd') {
+  if (busy) return;
   busy = true;
-  document.querySelectorAll('[data-quick],[data-media],[data-scene],[data-light],[data-brightness],[data-color],[data-volume]').forEach(b => b.disabled = true);
+  document.querySelectorAll('[data-result],[data-radio],[data-favorite],[data-speaker],[data-quick],[data-media],[data-scene],[data-light],[data-brightness],[data-color],[data-volume]').forEach(b => b.disabled = true);
   try { await fn(); toast(message); } catch (e) { toast(e.message); }
-  finally { busy = false; await load(); if ($('dialog').open && dialogMode === 'room') updateRoom(); }
+  finally { busy = false; await load(); if ($('dialog').open && dialogMode === 'room') updateRoom(); if ($('dialog').open && dialogMode === 'music') $('#dialog-body').innerHTML = resultButtons(results); }
 }
 function renderRoom(id) {
   selectedRoom = id; const room = state.rooms.find(r => r.id === id); if (!room) return;
@@ -300,7 +301,8 @@ async function showHistory(period) {
 let results = [];
 function resultButtons(items) {
   results = items; const target = state.speakers.find(s => s.entity === speaker)?.name;
-  return `<p>Afspelen op <b>${esc(target)}</b>. Kies een resultaat om te starten.</p>${items.length ? items.map((r, i) => `<button class="playlist" data-result="${i}">${r.image ? `<img class="art" src="${esc(r.image)}" alt="">` : '<span class="art">♫</span>'}<span><b>${esc(r.name)}</b><small>${esc(r.artist || r.type)} · ${esc(r.provider)} → ${esc(target)}</small></span></button>`).join('') : empty('Geen resultaten gevonden.')}`;
+  const canRadio = state.music.radio && state.music.radioSpeakers?.includes(speaker) && !offline(speaker);
+  return `<p>Afspelen op <b>${esc(target || 'Geen speaker')}</b>. Kies een resultaat om te starten.</p><p class="note">Een radiomix vervangt de wachtrij met vergelijkbare muziek. De muziekbron moet aanbevelingen ondersteunen.</p>${items.length ? items.map((r, i) => `<div class="music-result"><button class="playlist" data-result="${i}" ${busy || offline(speaker) ? 'disabled' : ''}>${r.image ? `<img class="art" src="${esc(r.image)}" alt="">` : '<span class="art">♫</span>'}<span><b>${esc(r.name)}</b><small>${esc(r.artist || r.type)} · ${esc(r.provider)} → ${esc(target)}</small></span></button>${r.type === 'track' ? `<button class="radio-button" data-radio="${i}" aria-label="Start radiomix voor ${esc(r.name)}" ${busy || !canRadio ? 'disabled' : ''}>Start radiomix</button>` : ''}</div>`).join('') : empty('Geen resultaten gevonden.')}${!canRadio ? '<p class="note">Radiomix vereist een online Music Assistant-speaker en een integratie met radiomodus.</p>' : ''}`;
 }
 async function loadFavorites() {
   const container = $('#favorites'); if (!container) return;
@@ -448,6 +450,24 @@ document.addEventListener('click', async event => {
       const q = await api('/api/music/queue', { entity: speaker });
       if (dialogMode === 'queue' && $('dialog').open) $('#dialog-body').innerHTML = `<div class="day">Nu</div><p>${esc(q.current || 'Geen muziek')}</p><div class="day">Hierna</div><p>${esc(q.next || 'Geen volgend nummer')}</p><p class="note">${esc(q.count ?? 0)} nummers · Shuffle ${q.shuffle ? 'aan' : 'uit'} · herhalen ${esc(q.repeat)}<br>Home Assistant levert het huidige en volgende nummer; de volledige lijst beheer je in Music Assistant.</p>`;
     } catch (e) { if (dialogMode === 'queue') $('#dialog-body').innerHTML = empty(e.message); }
+  }
+  if (b.dataset.radio !== undefined) {
+    const item = results[Number(b.dataset.radio)], target = speaker;
+    if (!item || busy) return;
+    perform(async () => {
+      $('#dialog-body').setAttribute('aria-busy', 'true');
+      try {
+        await api('/api/music/play', { entity: target, uri: item.uri, mode: 'radio' });
+        let hasNext = false;
+        if (state.music.queue) {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt) await new Promise(resolve => setTimeout(resolve, 1000));
+            try { const q = await api('/api/music/queue', { entity: target }); if (q.next) { hasNext = true; break; } } catch { break; }
+          }
+        }
+        modal('Radiomix aangevraagd', `<p>De opdracht voor <b>${esc(item.name)}</b> is geaccepteerd op <b>${esc(state.speakers.find(s => s.entity === target)?.name)}</b>.</p><p>${hasNext ? 'De speaker heeft een volgend nummer in de wachtrij. Dit bevestigt nog niet dat het uit deze mix komt.' : 'Vervolgtracks zijn nog niet bevestigd. De muziekbron ondersteunt mogelijk geen aanbevelingen voor dit nummer.'}</p><button data-queue>Bekijk wachtrij</button>`, 'radio-status');
+      } finally { $('#dialog-body').removeAttribute('aria-busy'); }
+    }, 'Radiomix aangevraagd');
   }
   if (b.dataset.result !== undefined) { const item = results[Number(b.dataset.result)]; perform(async () => { await api('/api/music/play', { entity: speaker, uri: item.uri }); $('dialog').close(); }); }
   if (b.dataset.favorite !== undefined) { const item = favorites[Number(b.dataset.favorite)]; perform(() => api('/api/music/play', { entity: speaker, uri: item.uri })); }
