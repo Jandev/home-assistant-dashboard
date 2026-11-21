@@ -80,9 +80,17 @@ export class HomeAssistant {
       return;
     }
     this.log('websocket_connecting');
-    const timeout = setTimeout(() => {
-      if (!this.connected) this.logFailure('websocket_handshake_timeout', new Error('Authentication timeout'));
+    const retryConnection = () => {
+      if (this.stopped || this.socket !== socket) return;
+      this.connected = false;
       this.closeSocket(socket);
+      this.scheduleReconnect();
+    };
+    const timeout = setTimeout(() => {
+      if (!this.connected) {
+        this.logFailure('websocket_handshake_timeout', new Error('Authentication timeout'));
+        retryConnection();
+      }
     }, 15000);
     socket.addEventListener('message', async ({ data }) => {
       if (this.socket !== socket) return;
@@ -117,28 +125,29 @@ export class HomeAssistant {
         this.lastSuccessAt = new Date().toISOString();
       }
     });
-    socket.addEventListener('error', () => {
+    socket.addEventListener('error', event => {
       if (this.socket !== socket) return;
       // WebSocket emits close after a connection error. Calling close here can
       // recursively emit error in Node's Undici WebSocket implementation.
-      this.logFailure('websocket_error', new Error('WebSocket transport error'));
+      this.logFailure('websocket_error', event?.error || new Error('WebSocket transport error'));
+      retryConnection();
     });
-    socket.addEventListener('close', () => {
+    socket.addEventListener('close', event => {
       if (this.socket !== socket) return;
       clearTimeout(timeout); this.connected = false;
       for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error('Verbinding verbroken')); }
       this.pending.clear();
-      this.log('websocket_closed', { retrying: !this.stopped, retryMs: this.stopped ? 0 : this.retry });
+      this.log('websocket_closed', { retrying: !this.stopped, retryMs: this.stopped ? 0 : this.retry, closeCode: event.code, wasClean: event.wasClean });
       if (!this.stopped) this.scheduleReconnect();
     });
   }
   scheduleReconnect() {
-    if (this.stopped) return;
+    if (this.stopped || this.reconnect) return;
     const delay = this.retry;
-    this.reconnect = setTimeout(() => this.connect(), delay);
+    this.reconnect = setTimeout(() => { this.reconnect = null; this.connect(); }, delay);
     this.retry = Math.min(60000, this.retry * 2);
   }
-  stop() { this.stopped = true; clearInterval(this.poll); clearInterval(this.heartbeat); clearTimeout(this.reconnect); this.closeSocket(this.socket); }
+  stop() { this.stopped = true; clearInterval(this.poll); clearInterval(this.heartbeat); clearTimeout(this.reconnect); this.reconnect = null; this.closeSocket(this.socket); }
   rooms() {
     return this.areas.map(area => {
       const ids = this.entities.filter(e => !e.disabled_by && (e.area_id === area.area_id || (!e.area_id && this.devices.find(d => d.id === e.device_id)?.area_id === area.area_id))).map(e => e.entity_id);
