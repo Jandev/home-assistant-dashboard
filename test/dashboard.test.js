@@ -85,7 +85,7 @@ test('gebieden volgen entity- en device-registry; infrastructuur-LEDs worden weg
   ha.entities = [{ entity_id: 'light.lamp', device_id: 'device' }, { entity_id: 'light.router_led', device_id: 'device' }, { entity_id: 'light.disabled', area_id: 'woonkamer', disabled_by: 'user' }];
   assert.deepEqual(ha.rooms()[0].entities, ['light.lamp']);
 });
-test('WebSocket-fout laat close-event reconnect afhandelen zonder recursieve close', () => {
+test('WebSocket-fout plant direct één retry en close plant geen dubbele retry', () => {
   const NativeWebSocket = globalThis.WebSocket, sockets = [];
   class FakeWebSocket extends EventTarget {
     readyState = 0;
@@ -98,9 +98,11 @@ test('WebSocket-fout laat close-event reconnect afhandelen zonder recursieve clo
   try {
     ha.start();
     sockets[0].dispatchEvent(new Event('error'));
-    assert.equal(sockets[0].closeCalls, 0);
+    assert.equal(sockets[0].closeCalls, 1);
+    const reconnect = ha.reconnect;
     sockets[0].readyState = 3;
     sockets[0].dispatchEvent(new Event('close'));
+    assert.equal(ha.reconnect, reconnect);
   } finally {
     ha.stop();
     globalThis.WebSocket = NativeWebSocket;
